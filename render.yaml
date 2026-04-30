@@ -1,0 +1,29 @@
+# Render Blueprint for the FirmOS backend.
+# Apply via: New + → Blueprint → connect this repo.
+# Secrets (DATABASE_URL, JWT_SECRET, CORS_ORIGINS) are intentionally
+# `sync: false` — set them manually in the Render dashboard so they are
+# never committed to the repo.
+
+services:
+  - type: web
+    name: firmos-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Migrations run on every deploy before uvicorn starts. Alembic is a
+    # no-op when the DB is already at head, so this is safe to repeat.
+    startCommand: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false

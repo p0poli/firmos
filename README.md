@@ -133,18 +133,24 @@ docker compose exec \
 
 ### Backend → Render
 
+The repo includes [`render.yaml`](render.yaml) — a Blueprint that pins all of the settings below. Easiest path: in Render click **New + → Blueprint**, point it at this repo, and Render reads the file. If you'd rather set things up manually, the equivalent values are:
+
 1. Create a new Web Service on Render pointing at the repo root.
-2. Set **Root Directory** to `backend`, **Build Command** to `pip install -r requirements.txt`, **Start Command** to `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+2. Set **Root Directory** to `backend`, **Build Command** to `pip install -r requirements.txt`, **Start Command** to:
+   ```
+   alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
+   ```
+   Migrations run on every deploy before uvicorn starts. Alembic is a no-op when the DB is already at head, so re-running is safe.
 3. Configure environment variables on Render:
+   - `PYTHON_VERSION` — `3.11.9` (also pinned via `backend/.python-version`; set the env var as well so Render can't fall back to its default)
    - `DATABASE_URL` — Supabase connection string (see below)
    - `JWT_SECRET` — long random string
    - `CORS_ORIGINS` — `https://<your-github-username>.github.io`
 4. Copy the **deploy hook URL** from Render → settings → deploy hook.
 5. In the GitHub repo settings → Secrets → Actions, add `RENDER_DEPLOY_HOOK_URL`.
 6. Push to `main`. The workflow [`deploy-backend.yml`](.github/workflows/deploy-backend.yml) calls the hook.
-7. After the first deploy, run migrations + seed once via the Render shell:
+7. After the first deploy, seed the admin user once via the Render shell (migrations have already run as part of the start command):
    ```bash
-   alembic upgrade head
    python seed.py
    ```
 
