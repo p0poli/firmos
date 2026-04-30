@@ -150,10 +150,32 @@ docker compose exec \
 
 ### Database → Supabase
 
-1. Create a Supabase project. Copy the connection string from **Project Settings → Database → Connection string → URI** (use the *direct* connection, not the pooler, for SQLAlchemy).
-2. Convert it to SQLAlchemy form:
-   `postgresql+psycopg2://postgres:<pwd>@db.<project>.supabase.co:5432/postgres`
-3. Set this as `DATABASE_URL` on Render.
+1. Create a Supabase project.
+2. Open **Project Settings → Database → Connection string** and copy the **Session pooler** URI (port `5432`, hostname `aws-0-<region>.pooler.supabase.com`). The direct `db.<project>.supabase.co` host is IPv6-only on Supabase's free tier and won't be reachable from Render; the session pooler holds long-lived connections, which is what SQLAlchemy wants. Avoid the **transaction pooler** on port `6543` for this app — it disables prepared statements, which SQLAlchemy uses by default.
+3. Prefix the URI with `+psycopg2` so SQLAlchemy picks the right driver. The final shape is:
+
+   ```
+   postgresql+psycopg2://postgres.<project-ref>:<DB_PASSWORD>@aws-0-<region>.pooler.supabase.com:5432/postgres
+   ```
+
+   Example for an `eu-west-1` project with ref `ihizlfarkwhszjztmecu`:
+
+   ```
+   postgresql+psycopg2://postgres.ihizlfarkwhszjztmecu:<DB_PASSWORD>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres
+   ```
+
+4. On Render, open your backend service → **Environment** → **Add Environment Variable**, set `DATABASE_URL` to the full string above with the real password substituted in. Save and Render will restart the service.
+
+5. After the service is up, open the Render shell (**Shell** tab on the service) and run the migration + seed once:
+
+   ```bash
+   alembic upgrade head
+   python seed.py
+   ```
+
+6. Verify Supabase received the schema: in Supabase → **Table Editor**, you should see `users`, `projects`, `tasks`, `firms`, etc.
+
+> **Never** put the real password in the repo, in `.env` files that are committed, or in any chat/issue/PR — set it only in the Render env-var UI. Supabase passwords show in cleartext in connection strings, so a leaked URL = a leaked password. If one slips out, reset it in **Supabase → Project Settings → Database → Reset database password** and update Render's env var.
 
 ### Frontend → GitHub Pages
 
