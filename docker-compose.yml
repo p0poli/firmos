@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: firmos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: firmos
+      POSTGRES_PASSWORD: firmos
+      POSTGRES_DB: firmos
+    ports:
+      - "5432:5432"
+    volumes:
+      - firmos_pg_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: firmos-backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://firmos:firmos@db:5432/firmos}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    image: node:20-alpine
+    container_name: firmos-frontend
+    working_dir: /app
+    depends_on:
+      - backend
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm install && npm start"
+
+volumes:
+  firmos_pg_data:

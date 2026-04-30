@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>FirmOS</Name>
+    <Assembly>FirmOS.dll</Assembly>
+    <FullClassName>FirmOS.Core.FirmOSApp</FullClassName>
+    <ClientId>8a2e9c5f-1d4b-4c8e-9f3a-7b6e5d4c3b2a</ClientId>
+    <VendorId>FIRMOS</VendorId>
+    <VendorDescription>FirmOS — firm management platform for architectural practices.</VendorDescription>
+  </AddIn>
+</RevitAddIns>
