@@ -1,8 +1,15 @@
 name: Deploy Frontend (GitHub Pages)
 
-# Build the React app and publish it via the official GitHub Pages
-# Actions flow. Pages serves the artifact directly — no `gh-pages`
-# branch is created or maintained.
+# Builds the React app from frontend/ and publishes the build output
+# to the `gh-pages` branch via peaceiris/actions-gh-pages.
+#
+# After the first successful run creates the branch, set:
+#   Settings -> Pages -> Source: "Deploy from a branch"
+#   Branch: gh-pages / / (root)
+#
+# Also verify Settings -> Actions -> General -> "Workflow permissions"
+# is set to "Read and write permissions" — the default GITHUB_TOKEN
+# needs write access to push the gh-pages branch.
 
 on:
   push:
@@ -12,29 +19,21 @@ on:
       - ".github/workflows/deploy-frontend.yml"
   workflow_dispatch:
 
-# Required by actions/deploy-pages: read repo contents, write the
-# Pages artifact, and mint an OIDC token so the deploy action can
-# authenticate to the Pages service without a secret.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# Only one Pages deploy at a time; cancel any in-flight run on a new push.
 concurrency:
   group: "pages"
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -42,32 +41,51 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        working-directory: frontend
         run: npm ci
 
       - name: Build production bundle
+        working-directory: frontend
         env:
-          # Falls back to the value baked into src/api/index.js when the
-          # secret is unset (the live Render backend URL).
+          # When the secret is unset, src/api/index.js falls back to the
+          # live Render backend URL hardcoded in the source.
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
-          # CRA treats ESLint warnings as errors when CI=true (the GitHub
-          # Actions default). Disable so warnings don't break the build.
+          # CRA treats ESLint warnings as errors when CI=true (which
+          # GitHub Actions sets by default). Disable so warnings don't
+          # break the build.
           CI: "false"
         run: npm run build
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      - name: Verify build output
+        # Failing this step is much more obvious in the run log than a
+        # later opaque deploy failure. Confirms index.html exists, has
+        # non-trivial size, and references the static/ asset folder.
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          test -f build/index.html
+          test -d build/static
+          ls -la build/
+          echo "--- index.html size ---"
+          wc -c build/index.html
+          echo "--- index.html head ---"
+          head -c 600 build/index.html
+          echo
+          grep -q '/firmos/static/' build/index.html \
+            || (echo "ERROR: index.html does not reference /firmos/static/ — homepage in package.json may be wrong" && exit 1)
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: frontend/build
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./frontend/build
+          publish_branch: gh-pages
+          # Each deploy replaces the branch with a single commit.
+          # Keeps the branch small and avoids accumulating history.
+          force_orphan: true
+          # Tells GitHub Pages not to run Jekyll on this branch — the
+          # build output is already final HTML/JS/CSS.
+          enable_jekyll: false
+          user_name: "github-actions[bot]"
+          user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          commit_message: "deploy: ${{ github.sha }}"

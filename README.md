@@ -185,14 +185,18 @@ The repo includes [`render.yaml`](render.yaml) — a Blueprint that pins all of 
 
 ### Frontend → GitHub Pages
 
-The repo must be **public** for free-tier GitHub Pages.
+The repo must be **public** for free-tier GitHub Pages. The deploy uses a `gh-pages` branch published by [`peaceiris/actions-gh-pages`](https://github.com/peaceiris/actions-gh-pages); the build output lives there as a single squashed commit and is served by Pages directly.
 
-1. In the repo settings → **Pages** → **Source**: **GitHub Actions**. (Save.) No branch needs to be selected — the workflow uploads its build output directly as a Pages artifact.
-2. Push to `main`. [`deploy-frontend.yml`](.github/workflows/deploy-frontend.yml) installs deps, runs `npm run build`, uploads `frontend/build/` via [`actions/upload-pages-artifact`](https://github.com/actions/upload-pages-artifact), and deploys it via [`actions/deploy-pages`](https://github.com/actions/deploy-pages). The first successful run is what makes the site appear in the **Pages** settings panel.
-3. (Optional) Add a repo secret `REACT_APP_API_URL` if you want to point the build at a backend other than the live Render one. The default — `https://firmos-backend.onrender.com` — is hardcoded as a fallback in [`frontend/src/api/index.js`](frontend/src/api/index.js), so the build works without the secret being set.
-4. The site lives at `https://<user>.github.io/firmos/`. `homepage` in `package.json` is set to that URL so CRA emits the right asset paths, and the app uses `HashRouter` so client-side routing works on Pages without rewrite rules.
+**One-time setup (in this exact order):**
 
-Subsequent pushes to `main` that touch `frontend/**` (or the workflow file itself) trigger a redeploy automatically; you can also re-run it on demand from the **Actions** tab via **Run workflow**.
+1. **Repo permissions for the workflow.** Settings → **Actions** → **General** → **Workflow permissions** → select **Read and write permissions** → Save. The workflow's `GITHUB_TOKEN` needs write access to push the `gh-pages` branch; if this is left at the default "Read repository contents and packages permissions", the deploy fails silently with a 403 even though the workflow's own `permissions:` block requests `contents: write`.
+2. **Trigger the first build.** Push any change under `frontend/**` (or run the workflow manually: Actions → *Deploy Frontend (GitHub Pages)* → Run workflow). The run creates the `gh-pages` branch.
+3. **Point Pages at the new branch.** Settings → **Pages** → **Source: Deploy from a branch** → **Branch: `gh-pages` / `/ (root)`** → Save. The `gh-pages` option won't be in the dropdown until step 2 completes.
+4. (Optional) Add a repo secret `REACT_APP_API_URL` if you want to point the build at a backend other than the live Render one. The default — `https://firmos-backend.onrender.com` — is hardcoded as a fallback in [`frontend/src/api/index.js`](frontend/src/api/index.js), so the build works without the secret being set.
+
+**Site URL:** `https://<user>.github.io/firmos/`. The `homepage` field in `frontend/package.json` is set to that URL so CRA emits the right asset paths under the `/firmos/` subpath, and the app uses `HashRouter` so client-side routing works on Pages without rewrite rules.
+
+Subsequent pushes to `main` that touch `frontend/**` (or the workflow file itself) trigger a redeploy automatically; you can also re-run it on demand from the **Actions** tab. Each deploy replaces `gh-pages` with a single fresh commit (`force_orphan: true` in the workflow), so the branch never accumulates history.
 
 ---
 
