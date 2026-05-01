@@ -11,6 +11,9 @@
     "react-router-dom": "^6.27.0",
     "react-scripts": "5.0.1"
   },
+  "overrides": {
+    "typescript": "^4.9.5"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
