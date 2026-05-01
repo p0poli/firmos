@@ -2,7 +2,7 @@
   "name": "firmos-frontend",
   "version": "0.1.0",
   "private": true,
-  "homepage": ".",
+  "homepage": "https://p0poli.github.io/firmos",
   "dependencies": {
     "axios": "^1.7.7",
     "react": "^18.3.1",

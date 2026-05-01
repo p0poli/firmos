@@ -1,6 +1,10 @@
 import axios from "axios";
 
-const baseURL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+// Default to the live Render backend so production builds work without
+// any extra env config. Override with REACT_APP_API_URL=http://localhost:8000
+// (or whatever) for local development — CRA reads this at build time.
+const baseURL =
+  process.env.REACT_APP_API_URL || "https://firmos-backend.onrender.com";
 
 const api = axios.create({ baseURL });
 

@@ -185,10 +185,12 @@ The repo includes [`render.yaml`](render.yaml) — a Blueprint that pins all of 
 
 ### Frontend → GitHub Pages
 
-1. In the repo settings → Pages → Source: **GitHub Actions**.
-2. Add a repo secret: `REACT_APP_API_URL` = your Render backend URL (e.g. `https://firmos-api.onrender.com`).
-3. Push to `main`. [`deploy-frontend.yml`](.github/workflows/deploy-frontend.yml) builds and publishes.
-4. The site will be at `https://<user>.github.io/<repo>/`. The `homepage: "."` in `package.json` and the use of `HashRouter` mean it works under any subpath without rewrite rules.
+1. Push to `main` once so [`deploy-frontend.yml`](.github/workflows/deploy-frontend.yml) creates the `gh-pages` branch on its first run. The workflow uses [`peaceiris/actions-gh-pages`](https://github.com/peaceiris/actions-gh-pages) and publishes the contents of `frontend/build/` there.
+2. In the repo settings → **Pages** → **Source**: **Deploy from a branch**, **Branch**: `gh-pages` / `/ (root)`. Save.
+3. (Optional) Add a repo secret `REACT_APP_API_URL` if you want to point the build at a backend other than the live Render one. The default — `https://firmos-backend.onrender.com` — is hardcoded as a fallback in [`frontend/src/api/index.js`](frontend/src/api/index.js), so the build works without the secret being set.
+4. The site lives at `https://<user>.github.io/firmos/`. `homepage` in `package.json` is set to that URL so CRA emits the right asset paths, and the app uses `HashRouter` so client-side routing works on Pages without rewrite rules.
+
+Subsequent pushes to `main` that touch `frontend/**` (or the workflow file itself) trigger a redeploy automatically; you can also re-run it on demand from the **Actions** tab via **Run workflow**.
 
 ---
 

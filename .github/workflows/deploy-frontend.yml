@@ -8,21 +8,19 @@ on:
       - ".github/workflows/deploy-frontend.yml"
   workflow_dispatch:
 
+# peaceiris/actions-gh-pages pushes the build output to the gh-pages
+# branch using GITHUB_TOKEN, so the workflow needs write access to the
+# repo contents.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: "pages"
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
 
@@ -33,24 +31,27 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - run: npm ci
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
 
-      - name: Build
+      - name: Build production bundle
+        working-directory: frontend
         env:
+          # Falls back to the value baked into src/api/index.js when the
+          # secret is not set. CI=false stops react-scripts from treating
+          # ESLint warnings as build failures.
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+          CI: "false"
         run: npm run build
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: frontend/build
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./frontend/build
+          publish_branch: gh-pages
+          # Disable Jekyll so files/folders starting with `_` (CRA emits
+          # none today, but future tooling might) are served as-is.
+          enable_jekyll: false
+          commit_message: "deploy: ${{ github.event.head_commit.message }}"
