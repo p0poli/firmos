@@ -1,7 +1,13 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
+from database import SessionLocal
+from models import User
 from routes import (
     auth,
     files,
@@ -13,8 +19,42 @@ from routes import (
     tasks,
     users,
 )
+from seed import seed
 
-app = FastAPI(title="FirmOS API", version="0.1.0")
+# Reuse uvicorn's logger so our messages share its formatter / handlers and
+# show up in the same place as the regular server logs (locally + on Render).
+logger = logging.getLogger("uvicorn.error")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """First-boot bootstrap.
+
+    If the users table is empty, run the idempotent seed so the system is
+    immediately loggable-into. seed() itself re-checks for existing rows
+    before inserting, so this is safe even under a race between two workers.
+    """
+    try:
+        db = SessionLocal()
+        try:
+            user_count = db.query(User).count()
+        finally:
+            db.close()
+
+        if user_count == 0:
+            logger.info("No users found — running first-boot seed.")
+            seed()
+        else:
+            logger.info("Users present (%d) — skipping seed.", user_count)
+    except SQLAlchemyError as exc:
+        # Don't crash the app if the DB isn't reachable or migrations haven't
+        # run yet; the operator can still hit /health and investigate.
+        logger.warning("Skipping first-boot seed: %s", exc)
+
+    yield
+
+
+app = FastAPI(title="FirmOS API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
