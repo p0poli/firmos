@@ -7,6 +7,7 @@ import KnowledgeGraph from "./pages/KnowledgeGraph";
 import Login from "./pages/Login";
 import Portfolio from "./pages/Portfolio";
 import ProjectDetail from "./pages/ProjectDetail";
+import Styleguide from "./pages/Styleguide";
 import Tasks from "./pages/Tasks";
 
 export default function App() {
@@ -14,6 +15,10 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Public, unauth — visual sanity check for design-system primitives.
+            Mounted at /#/_styleguide while the dark-theme redesign is being
+            built; will be removed once the overhaul ships. */}
+        <Route path="/_styleguide" element={<Styleguide />} />
         <Route
           element={
             <PrivateRoute>

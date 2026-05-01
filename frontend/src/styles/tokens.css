@@ -1,0 +1,107 @@
+/* Design tokens — single source of truth for the FirmOS dark theme.
+ *
+ * Anything visual references these via var(--token-*). Keeping every value
+ * here means the theme can be re-tuned in one place without touching
+ * component CSS, and it gives us a single artifact to diff when reviewing
+ * design changes.
+ */
+
+:root {
+  /* --- color: surface ------------------------------------------------- */
+  --color-bg: #0a0a0a;             /* page background, near-black */
+  --color-surface: #111111;        /* default card / panel surface */
+  --color-surface-elevated: #1a1a1a; /* hover, modal, popover */
+  --color-surface-hover: #171717;  /* subtle row / nav-item hover */
+
+  /* --- color: borders / dividers ------------------------------------- */
+  --color-border: #222222;         /* default subtle border */
+  --color-border-strong: #2e2e2e;  /* card-on-card separation, focus */
+
+  /* --- color: brand / state ------------------------------------------ */
+  --color-primary: #5865f2;        /* indigo — primary actions */
+  --color-primary-hover: #4752c4;
+  --color-primary-soft: rgba(88, 101, 242, 0.12); /* tinted backgrounds */
+  --color-success: #22c55e;
+  --color-success-soft: rgba(34, 197, 94, 0.12);
+  --color-warning: #f59e0b;
+  --color-warning-soft: rgba(245, 158, 11, 0.12);
+  --color-danger: #ef4444;
+  --color-danger-soft: rgba(239, 68, 68, 0.12);
+  --color-neutral-soft: rgba(161, 161, 170, 0.12);
+
+  /* --- color: text --------------------------------------------------- */
+  --color-text: #ffffff;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #52525b;
+
+  /* --- typography ---------------------------------------------------- */
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 32px;
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* --- spacing (8px base unit) -------------------------------------- */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* --- radii --------------------------------------------------------- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+
+  /* --- shadows / elevation ------------------------------------------ */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-focus: 0 0 0 2px rgba(88, 101, 242, 0.4);
+
+  /* --- motion -------------------------------------------------------- */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 280ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* --- layout chrome ------------------------------------------------- */
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 64px;
+  --topbar-height: 56px;
+  --content-max-width: 1440px;
+
+  /* --- z-index ------------------------------------------------------- */
+  --z-sidebar: 10;
+  --z-topbar: 20;
+  --z-popover: 50;
+  --z-modal: 100;
+  --z-toast: 200;
+}
