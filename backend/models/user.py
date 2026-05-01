@@ -20,7 +20,11 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True, index=True)
     hashed_password = Column(String, nullable=False)
-    role = Column(Enum(UserRole, name="user_role"), nullable=False, default=UserRole.member)
+    role = Column(
+        Enum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        default=UserRole.member,
+    )
 
     firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id", ondelete="CASCADE"), nullable=False)
 

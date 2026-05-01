@@ -119,12 +119,24 @@ docker compose exec \
   backend python seed.py
 ```
 
-### 4 — Smoke test
+### 4 — (Optional) Populate demo data
 
-1. Open http://localhost:3000 → log in with seeded credentials.
-2. The Dashboard loads (empty cards on first run — that's expected).
+To skip empty dashboards and have something to look at — projects, tasks, files, checks, insights — run the demo populator:
+
+```bash
+docker compose exec backend python populate_demo.py
+```
+
+This creates 3 demo users (`jane@firmos.dev`, `mike@firmos.dev`, `lina@firmos.dev`, all password `password`), 5 projects spanning every status (active / on-hold / completed / archived), 11 tasks, 5 files, a model event with three compliance check results, and a handful of insights — all attached to the existing **Demo Firm**. The auto-tagging hooks fire on each create, so the Knowledge Graph populates as a side effect.
+
+The script is idempotent — re-running it never duplicates anything; it only inserts the records that don't already exist. Override the firm name with `SEED_FIRM_NAME=...` (matches `seed.py`) and the demo password with `DEMO_PASSWORD=...` if needed.
+
+### 5 — Smoke test
+
+1. Open http://localhost:3000 → log in (admin: `admin@firmos.dev` / `admin`, or any demo user with password `password`).
+2. The Dashboard shows active sessions, recent checks, and recent insights once `populate_demo.py` has run.
 3. Hit http://localhost:8000/docs to play with the API directly. Use the `Authorize` button with the token from `POST /auth/login`.
-4. Create a project via the API, then visit Portfolio in the UI to see it.
+4. Visit Portfolio to filter projects by status.
 5. Visit Knowledge Graph — it fills in as you create entities (auto-tagging hooks fire on every create).
 
 ---

@@ -19,7 +19,10 @@ class Insight(Base):
     __tablename__ = "insights"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    type = Column(Enum(InsightType, name="insight_type"), nullable=False)
+    type = Column(
+        Enum(InsightType, name="insight_type", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
     content = Column(Text, nullable=False)
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
 

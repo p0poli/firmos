@@ -19,7 +19,10 @@ class ModelEvent(Base):
     __tablename__ = "model_events"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    event_type = Column(Enum(ModelEventType, name="model_event_type"), nullable=False)
+    event_type = Column(
+        Enum(ModelEventType, name="model_event_type", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
     timestamp = Column(DateTime, nullable=False)
     duration = Column(Integer, nullable=True)  # seconds
     revit_file_name = Column(String, nullable=True)

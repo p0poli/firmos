@@ -21,7 +21,11 @@ class File(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     url = Column(String, nullable=False)
-    source = Column(Enum(FileSource, name="file_source"), nullable=False, default=FileSource.uploaded)
+    source = Column(
+        Enum(FileSource, name="file_source", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        default=FileSource.uploaded,
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)

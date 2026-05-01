@@ -24,8 +24,15 @@ class CheckResult(Base):
     __tablename__ = "check_results"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    check_type = Column(Enum(CheckType, name="check_type"), nullable=False)
-    status = Column(Enum(CheckStatus, name="check_status"), nullable=False)
+    check_type = Column(
+        Enum(CheckType, name="check_type", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
+    status = Column(
+        # CheckStatus has name/value mismatches: passed→"pass", failed→"fail".
+        Enum(CheckStatus, name="check_status", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
     issues = Column(JSONB, nullable=False, default=list)
     timestamp = Column(DateTime, nullable=False)
 

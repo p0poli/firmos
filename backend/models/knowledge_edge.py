@@ -26,7 +26,10 @@ class KnowledgeEdge(Base):
     target_node_id = Column(
         UUID(as_uuid=True), ForeignKey("knowledge_nodes.id", ondelete="CASCADE"), nullable=False
     )
-    relationship_type = Column(Enum(RelationshipType, name="relationship_type"), nullable=False)
+    relationship_type = Column(
+        Enum(RelationshipType, name="relationship_type", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
 
     source = relationship("KnowledgeNode", foreign_keys=[source_node_id])
     target = relationship("KnowledgeNode", foreign_keys=[target_node_id])

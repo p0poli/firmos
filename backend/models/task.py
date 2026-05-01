@@ -27,8 +27,19 @@ class Task(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(Enum(TaskStatus, name="task_status"), nullable=False, default=TaskStatus.todo)
-    priority = Column(Enum(TaskPriority, name="task_priority"), nullable=False, default=TaskPriority.medium)
+    # values_callable forces SQLAlchemy to send the enum's `.value`
+    # ("in-progress") rather than the Python attribute name
+    # ("in_progress"), matching the Postgres enum type definition.
+    status = Column(
+        Enum(TaskStatus, name="task_status", values_callable=lambda enum: [e.value for e in enum]),
+        nullable=False,
+        default=TaskStatus.todo,
+    )
+    priority = Column(
+        Enum(TaskPriority, name="task_priority", values_callable=lambda enum: [e.value for e in enum]),
+        nullable=False,
+        default=TaskPriority.medium,
+    )
     due_date = Column(Date, nullable=True)
 
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)

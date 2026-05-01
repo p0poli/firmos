@@ -29,7 +29,14 @@ class Project(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(Enum(ProjectStatus, name="project_status"), nullable=False, default=ProjectStatus.active)
+    status = Column(
+        # values_callable forces SQLAlchemy to send the enum's `.value`
+        # ("on-hold") rather than the Python attribute name ("on_hold"),
+        # which is what the Postgres enum type was created with.
+        Enum(ProjectStatus, name="project_status", values_callable=lambda enum: [e.value for e in enum]),
+        nullable=False,
+        default=ProjectStatus.active,
+    )
     start_date = Column(Date, nullable=True)
     deadline = Column(Date, nullable=True)
 

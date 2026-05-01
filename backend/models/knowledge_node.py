@@ -21,7 +21,10 @@ class KnowledgeNode(Base):
     __tablename__ = "knowledge_nodes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    node_type = Column(Enum(NodeType, name="node_type"), nullable=False)
+    node_type = Column(
+        Enum(NodeType, name="node_type", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+    )
     reference_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     label = Column(String, nullable=False)
     # Mapped to DB column "metadata"; Python attribute renamed to avoid clash with SQLAlchemy Base.metadata.
