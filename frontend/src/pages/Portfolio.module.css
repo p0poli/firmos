@@ -1,0 +1,179 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* --- responsive 3 / 2 / 1 column grid -------------------------------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- card ---------------------------------------------------------------- */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.accent {
+  display: block;
+  width: 100%;
+  height: 4px;
+  flex-shrink: 0;
+}
+
+.cardBody {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardTitle {
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+  flex: 1;
+  min-width: 0;
+}
+
+.cardDescription {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+  /* clamp to 2 lines so a long description doesn't blow up the card */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.deadlineRow {
+  display: flex;
+  align-items: baseline;
+}
+
+.deadline,
+.deadlineUrgent,
+.deadlineOverdue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.deadlineUrgent {
+  color: var(--color-warning);
+}
+
+.deadlineOverdue {
+  color: var(--color-danger);
+}
+
+.deadlineDate {
+  font-weight: var(--font-weight-medium);
+  font-feature-settings: "tnum" 1;
+  color: inherit;
+}
+
+.deadlineRel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.deadlineUrgent .deadlineRel,
+.deadlineOverdue .deadlineRel {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.deadlineMuted {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  /* Push the row to the bottom of the card even when descriptions are short */
+}
+
+.breakdown {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  /* Limit growth so a chatty breakdown doesn't shove the avatars off-card */
+  max-width: 70%;
+}
+
+.breakdownEmpty {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* --- skeleton variant ---------------------------------------------------- */
+
+.cardSkeleton {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.accentSkeleton {
+  display: block;
+  width: 100%;
+  height: 4px;
+  flex-shrink: 0;
+  background: var(--color-border);
+}
