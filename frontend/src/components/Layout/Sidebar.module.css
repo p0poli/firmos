@@ -1,0 +1,143 @@
+.sidebar {
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  height: 100vh;
+  width: var(--sidebar-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  gap: var(--space-4);
+  z-index: var(--z-sidebar);
+}
+
+/* --- brand mark --- */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.brandWord {
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+/* --- nav stack --- */
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- footer (user card + logout) --- */
+
+.footer {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.userCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.userCard:hover {
+  background: var(--color-surface-hover);
+}
+
+.userMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.userName {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userEmail {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logoutBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.logoutBtn:hover {
+  background: var(--color-surface-elevated);
+  color: var(--color-danger);
+}
+
+/* --- collapsed (icon-only) on small screens --- */
+
+@media (max-width: 960px) {
+  .sidebar {
+    width: var(--sidebar-width-collapsed);
+    padding: var(--space-3) var(--space-2);
+    align-items: center;
+  }
+  .brand {
+    padding: var(--space-2);
+  }
+  .brandWord {
+    display: none;
+  }
+  .nav {
+    width: 100%;
+    align-items: stretch;
+  }
+  .userCard {
+    justify-content: center;
+    padding: var(--space-1);
+  }
+  .userMeta,
+  .logoutBtn {
+    display: none;
+  }
+}

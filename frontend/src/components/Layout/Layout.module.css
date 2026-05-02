@@ -1,0 +1,31 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0; /* prevents long content from pushing the layout wider than the viewport */
+}
+
+.content {
+  flex: 1;
+  padding: var(--space-6);
+  overflow-x: hidden;
+}
+
+/* Cap the content readable width for very wide displays — keeps long
+ * tables and dashboards from becoming runs of pixels. */
+.content > * {
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: var(--space-4);
+  }
+}

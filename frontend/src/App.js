@@ -3,10 +3,12 @@ import Layout from "./components/Layout";
 import PrivateRoute from "./components/PrivateRoute";
 import Dashboard from "./pages/Dashboard";
 import Files from "./pages/Files";
+import Gantt from "./pages/Gantt";
 import KnowledgeGraph from "./pages/KnowledgeGraph";
 import Login from "./pages/Login";
 import Portfolio from "./pages/Portfolio";
 import ProjectDetail from "./pages/ProjectDetail";
+import Settings from "./pages/Settings";
 import Styleguide from "./pages/Styleguide";
 import Tasks from "./pages/Tasks";
 
@@ -30,8 +32,10 @@ export default function App() {
           <Route path="portfolio" element={<Portfolio />} />
           <Route path="project/:id" element={<ProjectDetail />} />
           <Route path="tasks" element={<Tasks />} />
+          <Route path="gantt" element={<Gantt />} />
           <Route path="files" element={<Files />} />
           <Route path="knowledge" element={<KnowledgeGraph />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

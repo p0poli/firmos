@@ -1,65 +1,11 @@
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
-  background: #0f1115;
-  color: #e8e8e8;
-}
-
-a {
-  color: #6ea8fe;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-button {
-  cursor: pointer;
-}
-
-.app-shell {
-  display: flex;
-  min-height: 100vh;
-}
-
-.sidebar {
-  width: 220px;
-  background: #16181d;
-  border-right: 1px solid #25272e;
-  padding: 1.5rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.sidebar h1 {
-  font-size: 1.1rem;
-  margin: 0 0 1.5rem 0;
-  letter-spacing: 0.04em;
-}
-
-.sidebar a {
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  color: #c5c8d0;
-}
-
-.sidebar a.active {
-  background: #25272e;
-  color: #fff;
-}
-
-.main {
-  flex: 1;
-  padding: 2rem;
-  overflow-x: hidden;
-}
+/* Legacy styles kept alive until each pre-redesign page is rewritten.
+ *
+ * The conflicting body/global selectors that used to live here have been
+ * removed — the new tokens (loaded from styles/base.css) now own those.
+ * The class-based rules below are still referenced by Dashboard, Files,
+ * KnowledgeGraph, Login, Portfolio, ProjectDetail, and Tasks; each one
+ * gets removed when its page is rewritten in steps 3-9 of the overhaul.
+ */
 
 .card {
   background: #16181d;
