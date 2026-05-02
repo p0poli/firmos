@@ -66,6 +66,8 @@ export const getProject = (id) =>
   api.get(`/projects/${id}`).then((r) => r.data);
 export const getProjectTasks = (id) =>
   api.get(`/projects/${id}/tasks`).then((r) => r.data);
+export const updateTask = (id, payload) =>
+  api.patch(`/tasks/${id}`, payload).then((r) => r.data);
 export const getProjectFiles = (id) =>
   api.get(`/projects/${id}/files`).then((r) => r.data);
 export const getProjectInsights = (id) =>
