@@ -1,0 +1,116 @@
+/* Dark-theme overrides for gantt-task-react.
+ *
+ * The library exposes color props on its <Gantt /> component (which we set
+ * in GanttView.jsx), but the chrome — table header background, row
+ * borders, hover state, the date headers above the bars — comes from its
+ * stylesheet. We import that stylesheet first in GanttView.jsx, then
+ * override the bits that don't read on a near-black background here.
+ *
+ * Selectors are scoped under .firmos-gantt to keep the overrides
+ * specific to our wrapper and avoid leaking into anything else that
+ * might end up using the library on the page.
+ */
+
+.firmos-gantt {
+  /* Base background under the chart (sits behind the SVG so empty days
+   * past the last bar don't flash white). */
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* --- Left-side task list --- */
+
+.firmos-gantt .gantt-task-list-table-row {
+  background: var(--color-surface) !important;
+}
+
+.firmos-gantt .gantt-task-list-table-row:nth-of-type(2n) {
+  background: var(--color-surface-elevated) !important;
+}
+
+.firmos-gantt .gantt-task-list-header {
+  background: var(--color-surface-elevated) !important;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border) !important;
+}
+
+.firmos-gantt .gantt-task-list-header-cell {
+  border-right: 1px solid var(--color-border) !important;
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.firmos-gantt .gantt-task-list-cell {
+  color: var(--color-text);
+  border-right: 1px solid var(--color-border) !important;
+  padding-left: var(--space-3) !important;
+}
+
+/* --- SVG chart background and grid lines --- */
+
+.firmos-gantt .gantt-vertical-container,
+.firmos-gantt .gantt-horizontal-container {
+  background: var(--color-surface);
+}
+
+.firmos-gantt rect.gantt-row-line {
+  fill: var(--color-border);
+}
+
+.firmos-gantt line.gantt-row-line,
+.firmos-gantt line[stroke="#ebeff2"],
+.firmos-gantt line[stroke="#e6e4e4"] {
+  stroke: var(--color-border) !important;
+}
+
+/* The library uses several alternating-row "tickLine" rectangles with
+ * inline fills in light gray; force them to our surface tones. */
+.firmos-gantt rect[fill="#f5f5f5"],
+.firmos-gantt rect[fill="#fff"],
+.firmos-gantt rect[fill="#ffffff"] {
+  fill: var(--color-surface) !important;
+}
+
+.firmos-gantt rect[fill="#fafafa"],
+.firmos-gantt rect[fill="#fcfcfc"] {
+  fill: var(--color-surface-elevated) !important;
+}
+
+/* --- Date header (calendar row above the bars) --- */
+
+.firmos-gantt .gantt-calendar-top-text,
+.firmos-gantt .gantt-calendar-bottom-text {
+  fill: var(--color-text-secondary) !important;
+}
+
+.firmos-gantt .gantt-calendar-top-tick {
+  stroke: var(--color-border) !important;
+}
+
+/* The "today" vertical highlight comes from a prop, but the line that
+ * separates the calendar header from the chart body is from CSS. */
+.firmos-gantt .gantt-calendar-header {
+  fill: var(--color-surface-elevated) !important;
+}
+
+/* --- Tooltip on bar hover --- */
+
+.firmos-gantt .gantt-tooltip-default-container {
+  background: var(--color-surface-elevated) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--color-text) !important;
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans);
+}
+
+.firmos-gantt .gantt-tooltip-default-title {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.firmos-gantt .gantt-tooltip-default-paragraph {
+  color: var(--color-text-secondary);
+}

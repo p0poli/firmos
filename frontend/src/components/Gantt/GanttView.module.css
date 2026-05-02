@@ -1,0 +1,5 @@
+.wrap {
+  /* Side-scroll the chart on viewports too narrow for the timeline,
+   * rather than wrapping anything. */
+  overflow-x: auto;
+}

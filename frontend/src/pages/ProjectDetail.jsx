@@ -11,7 +11,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertOctagon,
   AlertTriangle,
-  BarChart3,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -42,6 +41,7 @@ import {
   getProjectInsights,
   getProjectTasks,
 } from "../api";
+import { GanttView, ViewMode } from "../components/Gantt";
 import {
   daysFromToday,
   deadlinePhrase,
@@ -232,7 +232,7 @@ export default function ProjectDetail() {
         <TasksTab tasks={tasks} project={project} />
       </TabPanel>
       <TabPanel active={activeTab === "gantt"}>
-        <GanttTabPlaceholder />
+        <ProjectGanttTab project={project} tasks={tasks} />
       </TabPanel>
       <TabPanel active={activeTab === "files"}>
         <FilesTab files={files} />
@@ -525,18 +525,92 @@ function TasksTab({ tasks, project }) {
   );
 }
 
-// --- Gantt tab placeholder -------------------------------------------------
+// --- Gantt tab (per-project) -----------------------------------------------
 
-function GanttTabPlaceholder() {
+const TASK_STATUS_PROGRESS = {
+  todo: 0,
+  "in-progress": 50,
+  review: 75,
+  done: 100,
+};
+
+const PRIORITY_BAR_COLOR = {
+  high: "#ef4444",
+  medium: "#f59e0b",
+  low: "#5865f2",
+};
+
+const SYNTHETIC_TASK_DURATION_DAYS = 7;
+
+function ProjectGanttTab({ project, tasks }) {
+  // Hook always called — keep above any early returns to satisfy
+  // rules-of-hooks.
+  const ganttTasks = useMemo(() => {
+    if (!Array.isArray(tasks)) return null;
+    return tasks
+      .filter((t) => t.due_date)
+      .map((t) => {
+        const end = new Date(t.due_date);
+        const start = new Date(end);
+        start.setDate(start.getDate() - SYNTHETIC_TASK_DURATION_DAYS);
+        const colour = PRIORITY_BAR_COLOR[t.priority] ?? "#a1a1aa";
+        return {
+          id: `task-${t.id}`,
+          name: t.title,
+          start,
+          end,
+          type: "task",
+          progress: TASK_STATUS_PROGRESS[t.status] ?? 0,
+          styles: {
+            backgroundColor: colour + "55",
+            backgroundSelectedColor: colour + "88",
+            progressColor: colour,
+            progressSelectedColor: colour,
+          },
+        };
+      });
+  }, [tasks]);
+
+  if (!project) return <SkeletonGroup count={4} />;
+  if (ganttTasks === null) return <SkeletonGroup count={4} />;
+
+  const tasksWithoutDue = (tasks ?? []).length - ganttTasks.length;
+
   return (
-    <Card padding="none">
-      <EmptyState
-        icon={BarChart3}
-        title="Gantt view is on its way"
-        description="Step 6 of the redesign adds the per-project timeline here. Until then the firm-wide Gantt page is under /gantt."
+    <div className={styles.ganttTab}>
+      <Card className={styles.ganttNote}>
+        <span>
+          Bar color shows priority (red high, amber medium, indigo low);
+          fill shows status progress. Each task is rendered as a{" "}
+          {SYNTHETIC_TASK_DURATION_DAYS}-day window ending at its due
+          date until tasks store a real start date.
+        </span>
+      </Card>
+      {tasksWithoutDue > 0 && (
+        <Card className={styles.ganttNote}>
+          <span>
+            {tasksWithoutDue}{" "}
+            {tasksWithoutDue === 1 ? "task is" : "tasks are"} missing a
+            due date and aren't on the timeline.
+          </span>
+        </Card>
+      )}
+      <GanttView
+        tasks={ganttTasks}
+        viewMode={ViewMode.Week}
+        viewDate={anchorAroundToday()}
+        emptyTitle="No tasks with due dates yet"
+        emptyDescription="Set a due date on at least one task to populate the timeline."
       />
-    </Card>
+    </div>
   );
+}
+
+// Anchor today in the chart by starting the view two weeks back.
+function anchorAroundToday() {
+  const d = new Date();
+  d.setDate(d.getDate() - 14);
+  return d;
 }
 
 // --- Files tab -------------------------------------------------------------
