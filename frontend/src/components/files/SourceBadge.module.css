@@ -1,0 +1,12 @@
+.badge {
+  /* Fixed width so file names align down a column. */
+  min-width: 76px;
+  justify-content: center;
+}
+
+/* ACC override — purple chip on top of the primary variant. */
+.acc {
+  background: rgba(168, 85, 247, 0.12) !important;
+  color: #c084fc !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}

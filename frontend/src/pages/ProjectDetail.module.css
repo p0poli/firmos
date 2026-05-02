@@ -336,12 +336,6 @@
   border-bottom: none;
 }
 
-.sourceBadge {
-  /* Make the badge a fixed width so file names align nicely down the column */
-  min-width: 76px;
-  justify-content: center;
-}
-
 .fileLink {
   flex: 1;
   display: inline-flex;

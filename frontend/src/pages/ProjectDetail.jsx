@@ -42,6 +42,7 @@ import {
   getProjectTasks,
 } from "../api";
 import { GanttView, ViewMode } from "../components/Gantt";
+import { SourceBadge } from "../components/files/SourceBadge";
 import {
   daysFromToday,
   deadlinePhrase,
@@ -63,23 +64,6 @@ const PRIORITY_TO_VARIANT = {
   high: "danger",
   medium: "warning",
   low: "neutral",
-};
-
-const FILE_SOURCE_VARIANT = {
-  BIM360: "primary", // indigo
-  ACC: "primary",
-  uploaded: "neutral",
-};
-
-// Override the file-source variant just for ACC so it reads as a
-// distinct purple chip rather than another indigo one — matches the
-// spec's "BIM360 blue / ACC purple / Uploaded gray".
-const FILE_SOURCE_STYLE_OVERRIDE = {
-  ACC: {
-    background: "rgba(168, 85, 247, 0.12)",
-    color: "#c084fc",
-    borderColor: "rgba(168, 85, 247, 0.3)",
-  },
 };
 
 const CHECK_ICON = {
@@ -651,24 +635,6 @@ function FilesTab({ files }) {
         ))}
       </ul>
     </Card>
-  );
-}
-
-function SourceBadge({ source }) {
-  const variant = FILE_SOURCE_VARIANT[source] ?? "neutral";
-  const override = FILE_SOURCE_STYLE_OVERRIDE[source];
-  return (
-    <Badge
-      variant={variant}
-      size="sm"
-      className={styles.sourceBadge}
-      // Inline style only used for the ACC purple override; everything
-      // else falls back to the badge primitive's variants.
-    >
-      <span style={override ? { color: override.color } : undefined}>
-        {source}
-      </span>
-    </Badge>
   );
 }
 
