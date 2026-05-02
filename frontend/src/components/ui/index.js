@@ -9,3 +9,4 @@ export { ProgressBar } from "./ProgressBar";
 export { Skeleton, SkeletonGroup } from "./Skeleton";
 export { EmptyState } from "./EmptyState";
 export { FilterPills } from "./FilterPills";
+export { Tabs, TabPanel } from "./Tabs";

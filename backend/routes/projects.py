@@ -4,10 +4,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session as OrmSession
 
 from database import get_db
-from models import File, Insight, Project, ProjectStatus, Task, User
+from models import (
+    CheckResult,
+    File,
+    Insight,
+    ModelEvent,
+    Project,
+    ProjectStatus,
+    Task,
+    User,
+)
 from schemas.file import FileOut
 from schemas.insight import InsightOut
 from schemas.project import ProjectCreate, ProjectOut, ProjectUpdate
+from schemas.revit import CheckResultOut
 from schemas.task import TaskOut
 from services import auth_service, knowledge_graph_service
 
@@ -129,5 +139,29 @@ def project_insights(
         db.query(Insight)
         .filter(Insight.project_id == project_id)
         .order_by(Insight.timestamp.desc())
+        .all()
+    )
+
+
+@router.get("/{project_id}/checks", response_model=list[CheckResultOut])
+def project_checks(
+    project_id: UUID,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: OrmSession = Depends(get_db),
+    user: User = Depends(auth_service.get_current_user),
+) -> list[CheckResult]:
+    """Compliance check results scoped to a single project.
+
+    CheckResult belongs to a ModelEvent which belongs to a Project, so we
+    join through ModelEvent to filter and let the firm-scoped project
+    lookup gate access.
+    """
+    _load_project(db, project_id, user.firm_id)
+    return (
+        db.query(CheckResult)
+        .join(ModelEvent, CheckResult.model_event_id == ModelEvent.id)
+        .filter(ModelEvent.project_id == project_id)
+        .order_by(CheckResult.timestamp.desc())
+        .limit(limit)
         .all()
     )

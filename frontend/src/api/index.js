@@ -70,6 +70,10 @@ export const getProjectFiles = (id) =>
   api.get(`/projects/${id}/files`).then((r) => r.data);
 export const getProjectInsights = (id) =>
   api.get(`/projects/${id}/insights`).then((r) => r.data);
+export const getProjectChecks = (id, limit = 50) =>
+  api
+    .get(`/projects/${id}/checks`, { params: { limit } })
+    .then((r) => r.data);
 export const generateInsights = (id) =>
   api.post(`/insights/generate/${id}`).then((r) => r.data);
 
