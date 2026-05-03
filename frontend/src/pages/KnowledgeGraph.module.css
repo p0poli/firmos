@@ -4,9 +4,24 @@
   gap: var(--space-4);
   /* Fill the whole content area so the canvas has a tall surface to
    * work on. The Layout caps the page at --content-max-width and gives
-   * us 24px padding; we just stretch inside that. */
+   * us 24px padding (16px on mobile); we just stretch inside that. */
   height: calc(100vh - var(--topbar-height) - var(--space-12));
   min-height: 480px;
+}
+
+@media (max-width: 640px) {
+  .page {
+    /* Layout content padding shrinks to var(--space-4) on phones. */
+    height: calc(100vh - var(--topbar-height) - var(--space-8));
+    min-height: 360px;
+  }
+  .legend {
+    /* Two-column legend on tiny screens so it doesn't take the whole
+     * vertical edge of the canvas. */
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-width: 200px;
+  }
 }
 
 /* --- toolbar -------------------------------------------------------- */

@@ -129,10 +129,16 @@
   box-shadow: 0 0 0 2px rgba(10, 10, 10, 1);
 }
 
+.userMenuWrap {
+  position: relative;
+}
+
 .userChip {
   display: inline-flex;
   align-items: center;
   padding: 4px;
+  border: 1px solid transparent;
+  background: none;
   border-radius: var(--radius-pill);
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-out);
@@ -140,6 +146,91 @@
 
 .userChip:hover {
   background: var(--color-surface-hover);
+}
+
+.userChip[aria-expanded="true"] {
+  background: var(--color-surface-elevated);
+}
+
+/* --- user dropdown menu --- */
+
+.userMenu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  min-width: 200px;
+  padding: var(--space-2);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: menuIn var(--duration-fast) var(--ease-out);
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.userMenuHeader {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.userMenuName {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.userMenuEmail {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userMenuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.userMenuItem:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.userMenuItem > svg {
+  flex-shrink: 0;
 }
 
 /* --- responsive --- */

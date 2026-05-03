@@ -43,6 +43,7 @@ import {
 } from "../api";
 import { GanttView, ViewMode } from "../components/Gantt";
 import { SourceBadge } from "../components/files/SourceBadge";
+import { usePageTitle } from "../hooks/usePageTitle";
 import {
   daysFromToday,
   deadlinePhrase,
@@ -109,6 +110,9 @@ export default function ProjectDetail() {
   const [insights, setInsights] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [notFound, setNotFound] = useState(false);
+
+  // Push the loaded project's name into the topbar + document title.
+  usePageTitle(project?.name);
 
   // Fan out everything in parallel on mount.
   useEffect(() => {
