@@ -2,14 +2,12 @@
  * GanttView — thin wrapper around `gantt-task-react`.
  *
  * Centralises:
- *   - the dark-theme color palette (passed via the library's color props
+ *   - the dark color palette (passed via the library's color props
  *     since the chart is rendered as SVG with inline fills)
- *   - the dark-theme CSS overrides for the surrounding chrome
- *   - the empty-state when callers pass an empty task list
- *   - viewMode → columnWidth defaults so the chart breathes correctly
- *
- * Both the firm-wide /gantt page and the per-project Gantt tab inside
- * ProjectDetail render through this single component.
+ *   - the dark CSS overrides for chrome (in ganttDarkTheme.css)
+ *   - dense default dimensions (rowHeight, headerHeight, columnWidth,
+ *     listCellWidth) so the chart fits a normal viewport
+ *   - the empty state when callers pass an empty task list
  */
 import React from "react";
 import { Gantt, ViewMode } from "gantt-task-react";
@@ -19,16 +17,20 @@ import { BarChart3 } from "lucide-react";
 import { Card, EmptyState } from "../ui";
 import styles from "./GanttView.module.css";
 
-// Per-viewMode column widths chosen so a typical timeline fits on screen
-// without horizontal scroll for short projects.
+// Per-viewMode column widths chosen so a typical timeline fits the
+// content area on a 1280px-wide desktop without horizontal scroll.
+//   Day:   ~31 days * 36px  ≈ 1116px
+//   Week:  ~13 weeks * 80px ≈ 1040px
+//   Month: ~12 months * 120px = 1440px (will scroll on smaller viewports)
+//   Year:   ~5 years * 200px = 1000px
 const COLUMN_WIDTH_BY_MODE = {
-  [ViewMode.Hour]: 30,
-  [ViewMode.QuarterDay]: 40,
-  [ViewMode.HalfDay]: 50,
-  [ViewMode.Day]: 56,
-  [ViewMode.Week]: 250,
-  [ViewMode.Month]: 240,
-  [ViewMode.Year]: 320,
+  [ViewMode.Hour]: 24,
+  [ViewMode.QuarterDay]: 32,
+  [ViewMode.HalfDay]: 40,
+  [ViewMode.Day]: 36,
+  [ViewMode.Week]: 80,
+  [ViewMode.Month]: 120,
+  [ViewMode.Year]: 200,
 };
 
 // Token-driven theme that we pass as props to <Gantt /> — the library
@@ -50,6 +52,13 @@ const THEME = {
   arrowColor: "#5865f2",
   todayColor: "rgba(88, 101, 242, 0.18)",
 };
+
+// Compact default dimensions — half the library's defaults, roughly.
+// Lower rowHeight means more rows fit before vertical scroll kicks in;
+// the smaller header / list cell width gives bars more horizontal space.
+const ROW_HEIGHT = 28;
+const HEADER_HEIGHT = 40;
+const LIST_CELL_WIDTH = "140px";
 
 export function GanttView({
   tasks,
@@ -80,13 +89,13 @@ export function GanttView({
         viewDate={viewDate}
         onClick={onClick}
         // chrome
-        rowHeight={36}
-        headerHeight={48}
+        rowHeight={ROW_HEIGHT}
+        headerHeight={HEADER_HEIGHT}
         columnWidth={COLUMN_WIDTH_BY_MODE[viewMode] ?? 60}
-        listCellWidth={showList ? "240px" : ""}
+        listCellWidth={showList ? LIST_CELL_WIDTH : ""}
         barCornerRadius={3}
-        fontFamily="Inter, sans-serif"
-        fontSize="13"
+        fontFamily="Inter, system-ui, sans-serif"
+        fontSize="12"
         // colors
         {...THEME}
       />
