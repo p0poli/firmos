@@ -1,2 +1,2 @@
-export { GanttView, ViewMode } from "./GanttView";
-export { default } from "./GanttView";
+export { GanttChart } from "./GanttChart";
+export { default } from "./GanttChart";

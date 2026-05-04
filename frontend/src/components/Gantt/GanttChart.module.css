@@ -1,0 +1,432 @@
+/* GanttChart styling.
+ *
+ * Sticky-table layout: one outer scroll container, with `position:
+ * sticky` on the corner / header / left-cell elements so they stay
+ * visible during their respective scroll directions.
+ */
+
+.shell {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.scroll {
+  width: 100%;
+  /* Cap height so the chart doesn't push the page taller than the
+   * viewport — anything beyond this is reachable via vertical scroll
+   * inside the chart itself. */
+  max-height: calc(100vh - 240px);
+  overflow: auto;
+  /* Smooth-scroll the today line back into view if the user clicks
+   * a navigation control later. */
+  scroll-behavior: smooth;
+}
+
+.inner {
+  position: relative;
+  /* width is set inline based on left + timeline */
+}
+
+/* ------------------------------------------------------------------ */
+/* Header row (sticky top)                                             */
+/* ------------------------------------------------------------------ */
+
+.headerRow {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  background: var(--color-surface-elevated);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cornerCell {
+  position: sticky;
+  left: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--space-3) var(--space-2);
+  background: var(--color-surface-elevated);
+  border-right: 1px solid var(--color-border);
+  /* z above the calendar so the corner stays clean during scroll. */
+  z-index: 2;
+}
+
+.cornerLabel {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.calHeader {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.calTopRow,
+.calBottomRow {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.calTopRow {
+  height: 28px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.calBottomRow {
+  height: 28px;
+}
+
+.calTopCell,
+.calBottomCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0 var(--space-2);
+  border-right: 1px solid var(--color-border);
+  font-feature-settings: "tnum" 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calTopCell {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.calBottomCell {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.calBottomToday {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ------------------------------------------------------------------ */
+/* Body rows                                                           */
+/* ------------------------------------------------------------------ */
+
+.bodyRow {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
+.even {
+  background: var(--color-surface);
+}
+
+.odd {
+  background: var(--color-surface-elevated);
+}
+
+.bodyRow.clickable {
+  cursor: pointer;
+}
+
+.bodyRow.clickable:hover .leftCell {
+  background: var(--color-surface-hover);
+}
+
+.bodyRow.clickable.even:hover {
+  background: var(--color-surface-hover);
+}
+
+.bodyRow.clickable.odd:hover {
+  background: var(--color-surface-hover);
+}
+
+/* --- left panel cell (sticky left) --- */
+
+.leftCell {
+  position: sticky;
+  left: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  background: inherit;
+  border-right: 1px solid var(--color-border);
+  z-index: 1;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.indented {
+  padding-left: calc(var(--space-2) + 24px);
+}
+
+.expandBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.expandBtn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.expandBtnHidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.chevron {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.colorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.rowLabel {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* --- bars cell --- */
+
+.barsCell {
+  position: relative;
+  flex-shrink: 0;
+  /* Vertical grid lines aligned with the calendar bottom cells.
+   * Drawn via a repeating background so we don't render N empty divs
+   * per row. */
+  background-image: linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--col-width) - 1px),
+    var(--color-border) calc(var(--col-width) - 1px),
+    var(--color-border) var(--col-width)
+  );
+  background-size: var(--col-width) 100%;
+  background-repeat: repeat;
+}
+
+/* Faint horizontal divider between rows. */
+.bodyRow:not(:last-child) .barsCell {
+  box-shadow: inset 0 -1px 0 var(--color-border);
+}
+
+.bodyRow:not(:last-child) .leftCell {
+  box-shadow: inset 0 -1px 0 var(--color-border);
+}
+
+/* --- bar --- */
+
+.bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 18px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  cursor: default;
+  /* The progress overlay sits inside; clip it. */
+  overflow: hidden;
+  transition: filter var(--duration-fast) var(--ease-out);
+}
+
+.bar:hover {
+  filter: brightness(1.15);
+}
+
+.barProgress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.18);
+  /* Slightly lighter overlay so progress reads against the bar's tint. */
+  pointer-events: none;
+}
+
+.barLabel {
+  position: relative;
+  z-index: 1;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Hidden when the bar is too narrow — surfaced by the overflow span
+   * outside the bar. */
+}
+
+.barLabelOverflow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  pointer-events: none;
+  /* Only shown via the parent `.bar`'s siblings rule below — we rely
+   * on the bar's inline label being present, and toggle visibility
+   * with a width-based trick is hard, so we keep this label hidden
+   * by default and let the user-agent tooltip + barLabel cover it.
+   * Future iteration: detect bar.width < label.scrollWidth in JS and
+   * toggle this. For now, inline label truncates with ellipsis. */
+  display: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Section row                                                         */
+/* ------------------------------------------------------------------ */
+
+.sectionRow {
+  position: relative;
+  display: flex;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sectionLeft {
+  position: sticky;
+  left: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-border);
+  z-index: 1;
+}
+
+.sectionLabel {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sectionCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  font-feature-settings: "tnum" 1;
+}
+
+.sectionRight {
+  flex: 1;
+  background: var(--color-bg);
+}
+
+/* ------------------------------------------------------------------ */
+/* Today vertical line                                                 */
+/* ------------------------------------------------------------------ */
+
+.todayLine {
+  position: absolute;
+  width: 1px;
+  background: var(--color-primary);
+  pointer-events: none;
+  z-index: 2;
+  /* Subtle glow so it reads as a marker, not a grid line. */
+  box-shadow: 0 0 4px rgba(88, 101, 242, 0.6);
+}
+
+/* ------------------------------------------------------------------ */
+/* Tooltip (anchored above the bar, pure-CSS hover)                    */
+/* ------------------------------------------------------------------ */
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  max-width: 280px;
+  padding: var(--space-3);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-out);
+  z-index: 5;
+  white-space: normal;
+}
+
+.bar:hover .tooltip {
+  opacity: 1;
+}
+
+.tooltipTitle {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+  word-break: break-word;
+}
+
+.tooltipRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 2px 0;
+  color: var(--color-text-secondary);
+}
+
+.tooltipKey {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+}

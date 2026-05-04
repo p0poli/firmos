@@ -41,7 +41,7 @@ import {
   getProjectInsights,
   getProjectTasks,
 } from "../api";
-import { GanttView, ViewMode } from "../components/Gantt";
+import { GanttChart } from "../components/Gantt";
 import { SourceBadge } from "../components/files/SourceBadge";
 import { usePageTitle } from "../hooks/usePageTitle";
 import {
@@ -528,41 +528,80 @@ const PRIORITY_BAR_COLOR = {
   low: "#5865f2",
 };
 
+const SECTION_ORDER = [
+  { key: "todo", label: "Todo" },
+  { key: "in-progress", label: "In progress" },
+  { key: "review", label: "Review" },
+  { key: "done", label: "Done" },
+];
+
 const SYNTHETIC_TASK_DURATION_DAYS = 7;
 
 function ProjectGanttTab({ project, tasks }) {
   // Hook always called — keep above any early returns to satisfy
-  // rules-of-hooks.
-  const ganttTasks = useMemo(() => {
+  // rules-of-hooks. Builds the GanttChart `rows` prop: a flat list
+  // alternating section-header rows and task rows, ordered by status.
+  const ganttRows = useMemo(() => {
     if (!Array.isArray(tasks)) return null;
-    return tasks
-      .filter((t) => t.due_date)
-      .map((t) => {
+    const datedTasks = tasks.filter((t) => t.due_date);
+    if (datedTasks.length === 0) return [];
+
+    // Group dated tasks by status.
+    const grouped = {};
+    for (const status of SECTION_ORDER) {
+      grouped[status.key] = [];
+    }
+    for (const t of datedTasks) {
+      if (grouped[t.status]) grouped[t.status].push(t);
+    }
+
+    const memberById = Object.fromEntries(
+      (project?.members ?? []).map((m) => [m.id, m])
+    );
+
+    const out = [];
+    for (const { key, label } of SECTION_ORDER) {
+      const ts = grouped[key];
+      if (ts.length === 0) continue;
+      out.push({
+        kind: "section",
+        id: `sec-${key}`,
+        label,
+        count: ts.length,
+      });
+      for (const t of ts) {
         const end = new Date(t.due_date);
         const start = new Date(end);
         start.setDate(start.getDate() - SYNTHETIC_TASK_DURATION_DAYS);
-        const colour = PRIORITY_BAR_COLOR[t.priority] ?? "#a1a1aa";
-        return {
+        const colour =
+          PRIORITY_BAR_COLOR[t.priority] ?? PRIORITY_BAR_COLOR.low;
+        const assignee = t.assigned_user_id
+          ? memberById[t.assigned_user_id]
+          : null;
+        out.push({
+          kind: "row",
           id: `task-${t.id}`,
-          name: t.title,
+          label: t.title,
           start,
           end,
-          type: "task",
+          color: colour,
           progress: TASK_STATUS_PROGRESS[t.status] ?? 0,
-          styles: {
-            backgroundColor: colour + "55",
-            backgroundSelectedColor: colour + "88",
-            progressColor: colour,
-            progressSelectedColor: colour,
-          },
-        };
-      });
-  }, [tasks]);
+          avatar: assignee
+            ? { name: assignee.name, email: assignee.email }
+            : null,
+          meta: t.priority ? `Priority: ${t.priority}` : undefined,
+        });
+      }
+    }
+    return out;
+  }, [tasks, project]);
 
   if (!project) return <SkeletonGroup count={4} />;
-  if (ganttTasks === null) return <SkeletonGroup count={4} />;
+  if (ganttRows === null) return <SkeletonGroup count={4} />;
 
-  const tasksWithoutDue = (tasks ?? []).length - ganttTasks.length;
+  const tasksWithoutDue =
+    (tasks ?? []).length -
+    (Array.isArray(tasks) ? tasks.filter((t) => t.due_date).length : 0);
 
   return (
     <div className={styles.ganttTab}>
@@ -583,22 +622,14 @@ function ProjectGanttTab({ project, tasks }) {
           </span>
         </Card>
       )}
-      <GanttView
-        tasks={ganttTasks}
-        viewMode={ViewMode.Week}
-        viewDate={anchorAroundToday()}
+      <GanttChart
+        rows={ganttRows}
+        viewMode="month"
         emptyTitle="No tasks with due dates yet"
         emptyDescription="Set a due date on at least one task to populate the timeline."
       />
     </div>
   );
-}
-
-// Anchor today in the chart by starting the view two weeks back.
-function anchorAroundToday() {
-  const d = new Date();
-  d.setDate(d.getDate() - 14);
-  return d;
 }
 
 // --- Files tab -------------------------------------------------------------
