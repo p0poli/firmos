@@ -28,9 +28,18 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(subject: str) -> str:
+def create_access_token(subject: str, *, role: str | None = None) -> str:
+    """Issue a signed JWT for `subject` (the user's UUID).
+
+    The role claim is optional but encouraged — the frontend reads it
+    locally on first paint to pick the right dashboard, before the
+    /users/me round-trip lands. The User row's role remains the source
+    of truth for any backend authorisation check.
+    """
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
     payload = {"sub": subject, "exp": expire}
+    if role is not None:
+        payload["role"] = role
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 

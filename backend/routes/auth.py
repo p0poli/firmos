@@ -22,7 +22,9 @@ def login(payload: LoginRequest, db: OrmSession = Depends(get_db)) -> TokenRespo
     db.commit()
     db.refresh(sess)
 
-    token = auth_service.create_access_token(str(user.id))
+    token = auth_service.create_access_token(
+        str(user.id), role=user.role.value if user.role else None
+    )
     return TokenResponse(access_token=token, session_id=str(sess.id))
 
 

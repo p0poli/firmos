@@ -163,10 +163,12 @@ def populate() -> None:
             print(f"[firm] using existing: {firm.name}")
 
         # 2. Users ---------------------------------------------------------
+        # One representative of each non-admin role so the dashboard
+        # selector has something to demo.
         users_def = [
-            ("Jane Cooper", "jane@firmos.dev", UserRole.member),
-            ("Mike Chen", "mike@firmos.dev", UserRole.member),
-            ("Lina Park", "lina@firmos.dev", UserRole.member),
+            ("Jane Cooper", "jane@firmos.dev", UserRole.project_manager),
+            ("Mike Chen", "mike@firmos.dev", UserRole.architect),
+            ("Lina Park", "lina@firmos.dev", UserRole.architect),
         ]
         users = {}
         for name, email, role in users_def:

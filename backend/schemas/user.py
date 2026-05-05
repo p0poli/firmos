@@ -9,7 +9,7 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
-    role: UserRole = UserRole.member
+    role: UserRole = UserRole.architect
 
 
 class UserOut(BaseModel):

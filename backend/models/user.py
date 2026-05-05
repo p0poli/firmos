@@ -10,7 +10,8 @@ from database import Base
 
 class UserRole(str, enum.Enum):
     admin = "admin"
-    member = "member"
+    project_manager = "project_manager"
+    architect = "architect"
 
 
 class User(Base):
@@ -23,7 +24,7 @@ class User(Base):
     role = Column(
         Enum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
-        default=UserRole.member,
+        default=UserRole.architect,
     )
 
     firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id", ondelete="CASCADE"), nullable=False)

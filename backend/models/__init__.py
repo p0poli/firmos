@@ -1,4 +1,5 @@
 from .firm import Firm
+from .firm_module import FirmModule, MODULE_KEYS
 from .user import User, UserRole
 from .session import Session
 from .project import Project, ProjectStatus, project_members
@@ -13,6 +14,8 @@ from .knowledge_edge import KnowledgeEdge, RelationshipType
 
 __all__ = [
     "Firm",
+    "FirmModule",
+    "MODULE_KEYS",
     "User",
     "UserRole",
     "Session",
