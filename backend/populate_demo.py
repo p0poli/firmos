@@ -25,6 +25,7 @@ from models import (
     File,
     FileSource,
     Firm,
+    FirmModule,
     Insight,
     InsightType,
     ModelEvent,
@@ -37,6 +38,7 @@ from models import (
     User,
     UserRole,
 )
+from seed import ensure_firm_modules
 from services import knowledge_graph_service as kg
 from services.auth_service import hash_password
 
@@ -45,9 +47,20 @@ from services.auth_service import hash_password
 
 
 def _get_or_create_user(db, firm, name, email, role, password):
+    """Find-or-create a demo user; reconcile role on existing rows.
+
+    The original implementation only created — once a user existed,
+    re-running populate_demo wouldn't bring its role back in line with
+    the spec. Now if the role drifted (e.g. legacy "member" rows post-
+    migration), we update it. Other fields are left alone.
+    """
     existing = db.query(User).filter(User.email == email).first()
     if existing:
-        return existing, False
+        if existing.role != role:
+            existing.role = role
+            db.flush()
+            return existing, False, True  # found, not created, role-updated
+        return existing, False, False
     u = User(
         name=name,
         email=email,
@@ -57,7 +70,7 @@ def _get_or_create_user(db, firm, name, email, role, password):
     )
     db.add(u)
     db.flush()
-    return u, True
+    return u, True, False  # created, role-not-updated (created with the right one)
 
 
 def _get_or_create_project(db, firm, name, **fields):
@@ -162,6 +175,29 @@ def populate() -> None:
         else:
             print(f"[firm] using existing: {firm.name}")
 
+        # 1a. Modules ------------------------------------------------------
+        # Ensure all four module rows exist for the demo firm, and flip
+        # revit_connect on so the per-role dashboard can demo the gated
+        # "Recent checks" section. Other modules stay inactive so the
+        # LockedModule UI has something to render.
+        added = ensure_firm_modules(db, firm)
+        if added > 0:
+            counts["modules_seeded"] = added
+            print(f"[modules] seeded {added} module row(s)")
+        revit = (
+            db.query(FirmModule)
+            .filter(
+                FirmModule.firm_id == firm.id,
+                FirmModule.module_key == "revit_connect",
+            )
+            .first()
+        )
+        if revit and not revit.is_active:
+            revit.is_active = True
+            revit.activated_at = now
+            counts["modules_activated"] = counts.get("modules_activated", 0) + 1
+            print("[modules] revit_connect activated")
+
         # 2. Users ---------------------------------------------------------
         # One representative of each non-admin role so the dashboard
         # selector has something to demo.
@@ -172,11 +208,16 @@ def populate() -> None:
         ]
         users = {}
         for name, email, role in users_def:
-            u, created = _get_or_create_user(db, firm, name, email, role, demo_password)
+            u, created, role_updated = _get_or_create_user(
+                db, firm, name, email, role, demo_password
+            )
             users[email] = u
             if created:
                 counts["users"] += 1
-                print(f"[user] created: {email}")
+                print(f"[user] created: {email} as {role.value}")
+            elif role_updated:
+                counts["roles_updated"] = counts.get("roles_updated", 0) + 1
+                print(f"[user] role updated: {email} -> {role.value}")
 
         # 3. Projects ------------------------------------------------------
         projects_def = [
