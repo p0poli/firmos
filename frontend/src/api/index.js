@@ -174,6 +174,29 @@ export const updateUserRole = (userId, role) =>
 export const updateModule = (moduleKey, isActive) =>
   api.patch(`/modules/${moduleKey}`, { is_active: isActive }).then((r) => r.data);
 
+// --- firm settings (AI provider + key) ------------------------------------
+
+/**
+ * Fetch current firm AI settings. Admin only.
+ * Returns { ai_provider, has_custom_key }.
+ */
+export const getFirmSettings = () =>
+  api.get("/settings/").then((r) => r.data);
+
+/**
+ * Switch the firm's AI provider. Admin only.
+ * provider ∈ { "anthropic" | "openai" }
+ */
+export const updateAiProvider = (provider) =>
+  api.patch("/settings/ai-provider", { provider }).then((r) => r.data);
+
+/**
+ * Encrypt + store (or clear) a per-firm API key. Admin only.
+ * Pass an empty string to clear the stored key.
+ */
+export const updateAiKey = (apiKey) =>
+  api.patch("/settings/ai-key", { api_key: apiKey }).then((r) => r.data);
+
 // --- Vitruvius / modules ---------------------------------------------------
 
 /** Fetch all firm modules (key, display_name, is_active, activated_at). */

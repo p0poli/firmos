@@ -18,6 +18,7 @@ from routes import (
     projects,
     revit,
     sessions,
+    settings,
     tasks,
     users,
 )
@@ -91,6 +92,7 @@ app.include_router(revit.router)
 app.include_router(knowledge.router)
 app.include_router(insights.router)
 app.include_router(modules.router)
+app.include_router(settings.router)
 
 
 @app.get("/")

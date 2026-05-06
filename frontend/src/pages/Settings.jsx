@@ -33,8 +33,11 @@ import {
 } from "../components/ui";
 import {
   createUser,
+  getFirmSettings,
   listUsers,
   logout,
+  updateAiKey,
+  updateAiProvider,
   updateModule,
   updateUserRole,
 } from "../api";
@@ -201,48 +204,84 @@ function AccountTab({ user, role, loading, onLogout }) {
 // --- AI Settings tab -------------------------------------------------------
 
 const PROVIDERS = [
-  {
-    key: "anthropic",
-    label: "Anthropic",
-    sub: "Claude — default provider",
-  },
-  {
-    key: "openai",
-    label: "OpenAI",
-    sub: "GPT-4o",
-  },
+  { key: "anthropic", label: "Anthropic", sub: "Claude — default provider" },
+  { key: "openai",    label: "OpenAI",    sub: "GPT-4o" },
 ];
 
 function AiSettingsTab() {
-  const [provider, setProvider] = useState("anthropic");
-  const [apiKey, setApiKey] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState(null); // { text, ok }
+  const [provider,    setProvider]    = useState("anthropic");
+  const [hasKey,      setHasKey]      = useState(false);
+  const [apiKey,      setApiKey]      = useState("");
+  const [loadError,   setLoadError]   = useState(null);
+  const [provMsg,     setProvMsg]     = useState(null); // { text, ok }
+  const [keyMsg,      setKeyMsg]      = useState(null);
+  const [savingProv,  setSavingProv]  = useState(false);
+  const [savingKey,   setSavingKey]   = useState(false);
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setMsg(null);
+  // Load current settings on mount
+  useEffect(() => {
+    let cancelled = false;
+    getFirmSettings()
+      .then((s) => {
+        if (cancelled) return;
+        setProvider(s.ai_provider || "anthropic");
+        setHasKey(s.has_custom_key);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(err?.response?.data?.detail ?? "Could not load AI settings.");
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleProviderSave = async () => {
+    setSavingProv(true);
+    setProvMsg(null);
     try {
-      // Placeholder — Step 6 will add these backend endpoints.
-      // For now we surface a clear message rather than silently failing.
-      await Promise.resolve(); // swap out for real API calls in Step 6
-      setMsg({ text: "Settings endpoint not yet deployed — configure via environment variables.", ok: false });
+      const updated = await updateAiProvider(provider);
+      setProvider(updated.ai_provider);
+      setProvMsg({ text: "Provider updated.", ok: true });
     } catch (err) {
-      setMsg({ text: err?.response?.data?.detail ?? "Save failed.", ok: false });
+      setProvMsg({ text: err?.response?.data?.detail ?? "Save failed.", ok: false });
     } finally {
-      setSaving(false);
+      setSavingProv(false);
+    }
+  };
+
+  const handleKeySave = async () => {
+    setSavingKey(true);
+    setKeyMsg(null);
+    try {
+      const updated = await updateAiKey(apiKey);
+      setHasKey(updated.has_custom_key);
+      setApiKey("");
+      setKeyMsg({
+        text: apiKey ? "Key stored and encrypted." : "Custom key cleared — using env var.",
+        ok: true,
+      });
+    } catch (err) {
+      setKeyMsg({ text: err?.response?.data?.detail ?? "Save failed.", ok: false });
+    } finally {
+      setSavingKey(false);
     }
   };
 
   return (
     <div className={styles.tabPanel}>
+      {loadError && (
+        <Card padding="lg">
+          <p style={{ color: "var(--color-danger)", fontSize: "var(--text-sm)" }}>
+            {loadError}
+          </p>
+        </Card>
+      )}
+
+      {/* Provider selector */}
       <Card padding="lg">
         <CardHeader
           title="AI provider"
           subtitle="Choose which provider Vitruvius uses to generate insights and answer questions."
         />
-
         <div className={styles.section}>
           <div className={styles.providerRow}>
             {PROVIDERS.map((p) => (
@@ -260,46 +299,79 @@ function AiSettingsTab() {
               </button>
             ))}
           </div>
+          <div className={styles.formActions}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleProviderSave}
+              disabled={savingProv}
+            >
+              {savingProv ? "Saving…" : "Save provider"}
+            </Button>
+            {provMsg && (
+              <span className={`${styles.saveMsg} ${provMsg.ok ? styles.ok : styles.err}`}>
+                {provMsg.text}
+              </span>
+            )}
+          </div>
+        </div>
+      </Card>
 
+      {/* API key */}
+      <Card padding="lg">
+        <CardHeader
+          title="API key"
+          subtitle="Per-firm key stored encrypted (Fernet). Leave blank to use the server's env var."
+        />
+        <div className={styles.section}>
           <div className={styles.fieldGroup}>
             <label className={styles.fieldLabel} htmlFor="ai-key">
-              API key
+              {hasKey ? "Replace stored key" : "API key"}
             </label>
             <input
               id="ai-key"
               type="password"
               className={styles.fieldInput}
-              placeholder="sk-ant-… or sk-…  (leave blank to use env var)"
+              placeholder={
+                hasKey
+                  ? "••••••••  (stored — enter new value to replace)"
+                  : "sk-ant-…  or  sk-…  (leave blank to use env var)"
+              }
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               autoComplete="off"
             />
             <span className={styles.fieldHint}>
-              The key is encrypted at rest (Fernet). Leave blank to fall back to the
-              system-wide env var (<code>ANTHROPIC_API_KEY</code> / <code>OPENAI_API_KEY</code>).
+              Supports <code>ANTHROPIC_API_KEY</code> and <code>OPENAI_API_KEY</code> formats.
+              Save with an empty field to clear the stored key and revert to the env var.
             </span>
           </div>
-
           <div className={styles.formActions}>
             <Button
               variant="primary"
               size="sm"
-              onClick={handleSave}
-              disabled={saving}
+              onClick={handleKeySave}
+              disabled={savingKey}
             >
-              {saving ? "Saving…" : "Save AI settings"}
+              {savingKey
+                ? "Saving…"
+                : apiKey
+                ? "Store key"
+                : hasKey
+                ? "Clear stored key"
+                : "Save"}
             </Button>
-            {msg && (
-              <span className={`${styles.saveMsg} ${msg.ok ? styles.ok : styles.err}`}>
-                {msg.text}
+            {hasKey && !apiKey && (
+              <span className={`${styles.saveMsg} ${styles.ok}`}>
+                Custom key active
+              </span>
+            )}
+            {keyMsg && (
+              <span className={`${styles.saveMsg} ${keyMsg.ok ? styles.ok : styles.err}`}>
+                {keyMsg.text}
               </span>
             )}
           </div>
-
-          <span className={styles.fieldHint} style={{ marginTop: "var(--space-1)" }}>
-            ⚠️ Provider/key management endpoints will be wired in the next backend release.
-            Env vars are the recommended approach for production deployments.
-          </span>
         </div>
       </Card>
     </div>
