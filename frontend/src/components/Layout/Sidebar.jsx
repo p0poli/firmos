@@ -13,9 +13,15 @@ import {
 } from "lucide-react";
 import { Avatar } from "../ui";
 import { logout } from "../../api";
-import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useUser } from "../../contexts/UserContext";
 import { SidebarNavItem } from "./SidebarNavItem";
 import styles from "./Sidebar.module.css";
+
+const ROLE_LABELS = {
+  admin: "Admin",
+  project_manager: "Project Manager",
+  architect: "Architect",
+};
 
 const NAV_ITEMS = [
   { to: "/", icon: Home, label: "Dashboard", end: true },
@@ -29,7 +35,7 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const navigate = useNavigate();
-  const { user, loading } = useCurrentUser();
+  const { user, role, loading } = useUser();
 
   const handleLogout = async () => {
     try {
@@ -45,7 +51,7 @@ export function Sidebar() {
         <span className={styles.brandMark} aria-hidden="true">
           <Squircle size={18} strokeWidth={2.5} />
         </span>
-        <span className={styles.brandWord}>FirmOS</span>
+        <span className={styles.brandWord}>Vitruvius</span>
       </div>
 
       <nav className={styles.nav}>
@@ -67,6 +73,11 @@ export function Sidebar() {
             </span>
             {user?.email && (
               <span className={styles.userEmail}>{user.email}</span>
+            )}
+            {role && (
+              <span className={styles.roleBadge}>
+                {ROLE_LABELS[role] ?? role}
+              </span>
             )}
           </div>
           <button

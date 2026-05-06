@@ -2,10 +2,16 @@ import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Search, Settings as SettingsIcon } from "lucide-react";
 import { Avatar } from "../ui";
-import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useUser } from "../../contexts/UserContext";
 import { usePageTitleOverride } from "../../contexts/PageTitleContext";
 import { logout } from "../../api";
 import styles from "./Topbar.module.css";
+
+const ROLE_LABELS = {
+  admin: "Admin",
+  project_manager: "Project Manager",
+  architect: "Architect",
+};
 
 /**
  * Maps the current route to a default page title shown on the left of
@@ -21,12 +27,12 @@ function deriveTitle(pathname) {
   if (pathname.startsWith("/knowledge")) return "Knowledge Graph";
   if (pathname.startsWith("/settings")) return "Settings";
   if (pathname.startsWith("/project/")) return "Project";
-  return "FirmOS";
+  return "Vitruvius";
 }
 
 export function Topbar() {
   const { pathname } = useLocation();
-  const { user } = useCurrentUser();
+  const { user } = useUser();
   const { override } = usePageTitleOverride();
   const title = override ?? deriveTitle(pathname);
 
@@ -34,7 +40,8 @@ export function Topbar() {
   // Pages that need a dynamic name still call usePageTitle() — this
   // useEffect just covers the static fallback.
   useEffect(() => {
-    document.title = title === "FirmOS" ? "FirmOS" : `${title} · FirmOS`;
+    document.title =
+      title === "Vitruvius" ? "Vitruvius" : `${title} · Vitruvius`;
   }, [title]);
 
   return (
@@ -74,7 +81,7 @@ export function Topbar() {
           <span className={styles.notifDot} aria-hidden="true" />
         </button>
 
-        <UserMenu user={user} />
+        <UserMenu />
       </div>
     </header>
   );
@@ -82,7 +89,8 @@ export function Topbar() {
 
 // --- user menu ------------------------------------------------------------
 
-function UserMenu({ user }) {
+function UserMenu() {
+  const { user, role } = useUser();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const navigate = useNavigate();
@@ -138,6 +146,11 @@ function UserMenu({ user }) {
             <div className={styles.userMenuHeader}>
               <span className={styles.userMenuName}>{user.name}</span>
               <span className={styles.userMenuEmail}>{user.email}</span>
+              {role && (
+                <span className={styles.userMenuRole}>
+                  {ROLE_LABELS[role] ?? role}
+                </span>
+              )}
             </div>
           )}
           <button
