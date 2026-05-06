@@ -1,0 +1,519 @@
+/* Shared dashboard layout — used by AdminDashboard, ProjectManagerDashboard,
+ * and ArchitectDashboard. Imports the same tokens as the legacy Dashboard.
+ *
+ * Two-column rows collapse to single-column on tablets (≤960px).
+ * The project scroller goes side-scroll natively when many cards exist.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.errorCard {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  border-color: rgba(239, 68, 68, 0.4);
+  background: var(--color-danger-soft);
+}
+
+/* --- stat row (admin overview) ----------------------------------------- */
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1200px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .statsRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- two-column section ----------------------------------------------- */
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 960px) {
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- generic section header ------------------------------------------- */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-1);
+}
+
+.sectionTitle {
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.sectionMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-feature-settings: "tnum" 1;
+}
+
+/* --- project horizontal scroller -------------------------------------- */
+
+.projectScroll {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 1fr);
+  gap: var(--space-4);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: var(--space-2);
+  scroll-snap-type: x mandatory;
+  margin-inline: calc(-1 * var(--space-1));
+  padding-inline: var(--space-1);
+}
+
+@media (min-width: 960px) {
+  .projectScroll {
+    grid-auto-columns: minmax(320px, 1fr);
+  }
+}
+
+.projectScroll > * {
+  scroll-snap-align: start;
+}
+
+.projectCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  min-height: 152px;
+}
+
+.projectCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.projectCardTitle {
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.projectCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  gap: var(--space-3);
+}
+
+.projectCardSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  min-height: 152px;
+}
+
+.deadline,
+.deadlineUrgent,
+.deadlineOverdue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.deadlineUrgent {
+  color: var(--color-warning);
+}
+
+.deadlineOverdue {
+  color: var(--color-danger);
+}
+
+.deadlineDate {
+  font-weight: var(--font-weight-medium);
+  font-feature-settings: "tnum" 1;
+  color: inherit;
+}
+
+.deadlineRel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.deadlineUrgent .deadlineRel,
+.deadlineOverdue .deadlineRel {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* --- shared list rows -------------------------------------------------- */
+
+.taskList,
+.insightList,
+.sessionList,
+.checkList,
+.portfolioList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.taskRow,
+.insightRow,
+.sessionRow,
+.checkRow,
+.portfolioRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.taskRow:last-child,
+.insightRow:last-child,
+.sessionRow:last-child,
+.checkRow:last-child,
+.portfolioRow:last-child {
+  border-bottom: none;
+}
+
+/* --- Due Soon ---------------------------------------------------------- */
+
+.projectDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.taskBody,
+.insightBody,
+.sessionBody,
+.checkBody,
+.portfolioBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.taskTitle {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.taskMeta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.overdue {
+  color: var(--color-danger);
+}
+
+.dotSep {
+  color: var(--color-text-muted);
+  margin: 0 var(--space-1);
+}
+
+/* --- Insights ---------------------------------------------------------- */
+
+.insightIcon,
+.checkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+
+.intent-primary {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-color: rgba(88, 101, 242, 0.25);
+}
+
+.intent-success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.intent-warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.intent-danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.insightContent {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: var(--leading-normal);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insightMeta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* --- Active sessions --------------------------------------------------- */
+
+.sessionName {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.sessionMeta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.strong {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.sessionDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+  animation: sessionPulse 2.4s var(--ease-in-out) infinite;
+  flex-shrink: 0;
+}
+
+@keyframes sessionPulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sessionDot {
+    animation: none;
+  }
+}
+
+/* --- Recent checks ----------------------------------------------------- */
+
+.checkType {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  text-transform: capitalize;
+}
+
+.checkMeta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* --- Portfolio row (admin) --------------------------------------------- */
+
+.portfolioName {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portfolioMeta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.portfolioProgress {
+  flex: 0 0 140px;
+}
+
+@media (max-width: 700px) {
+  .portfolioProgress {
+    display: none;
+  }
+}
+
+/* --- Bottleneck alert banner (PM) -------------------------------------- */
+
+.bottleneckAlert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-warning-soft);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.bottleneckAlertIcon {
+  color: var(--color-warning);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.bottleneckAlertText {
+  flex: 1;
+  line-height: var(--leading-normal);
+}
+
+/* --- Ask Vitruvius inline panel --------------------------------------- */
+
+.askToggleBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-2);
+}
+
+.askToggleLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.askPanel {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--color-bg);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.askForm {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.askTextarea {
+  flex: 1;
+  resize: none;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  line-height: var(--leading-normal);
+  min-height: 60px;
+  max-height: 120px;
+  transition: border-color 0.15s;
+}
+
+.askTextarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.askTextarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.askAnswer {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: var(--leading-relaxed);
+}
+
+.askAnswerMeta {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.askError {
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-danger-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}

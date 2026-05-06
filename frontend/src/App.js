@@ -2,6 +2,7 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import PrivateRoute from "./components/PrivateRoute";
 import { PageTitleProvider } from "./contexts/PageTitleContext";
+import { UserProvider } from "./contexts/UserContext";
 import Dashboard from "./pages/Dashboard";
 import Files from "./pages/Files";
 import Gantt from "./pages/Gantt";
@@ -15,6 +16,7 @@ import Tasks from "./pages/Tasks";
 
 export default function App() {
   return (
+    <UserProvider>
     <PageTitleProvider>
       <HashRouter>
         <Routes>
@@ -43,5 +45,6 @@ export default function App() {
         </Routes>
       </HashRouter>
     </PageTitleProvider>
+    </UserProvider>
   );
 }

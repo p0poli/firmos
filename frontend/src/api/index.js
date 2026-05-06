@@ -8,17 +8,53 @@ const baseURL =
 
 const api = axios.create({ baseURL });
 
-const TOKEN_KEY = "firmos_token";
+const TOKEN_KEY   = "firmos_token";
 const SESSION_KEY = "firmos_session_id";
+const ROLE_KEY    = "firmos_role";
+const MODULES_KEY = "firmos_modules";
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const getToken     = () => localStorage.getItem(TOKEN_KEY);
 export const getSessionId = () => localStorage.getItem(SESSION_KEY);
-export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
+export const setToken     = (token) => localStorage.setItem(TOKEN_KEY, token);
 export const setSessionId = (id) => localStorage.setItem(SESSION_KEY, id);
+
+/** Read the cached role (written at login-time from the JWT payload). */
+export const getRole = () => localStorage.getItem(ROLE_KEY) || "architect";
+
+/** Read the cached module list (written at login-time). */
+export const getStoredModules = () => {
+  try {
+    return JSON.parse(localStorage.getItem(MODULES_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+/** Persist the module list so UserContext can hydrate without an extra fetch. */
+export const setStoredModules = (data) =>
+  localStorage.setItem(MODULES_KEY, JSON.stringify(data));
+
 export const clearAuth = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem(MODULES_KEY);
 };
+
+/**
+ * Decode a JWT payload without verifying the signature.
+ * Used only for reading the `role` claim for UI routing — the server
+ * re-validates the token on every request.
+ */
+export function decodeJwt(token) {
+  try {
+    const segment = token.split(".")[1];
+    const padded  = segment + "=".repeat((4 - (segment.length % 4)) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
 
 api.interceptors.request.use((config) => {
   const token = getToken();
@@ -45,6 +81,19 @@ export const login = async (email, password) => {
   const { data } = await api.post("/auth/login", { email, password });
   setToken(data.access_token);
   setSessionId(data.session_id);
+
+  // Decode the role claim and cache it so UserContext can render the right
+  // dashboard variant immediately without a round-trip.
+  const payload = decodeJwt(data.access_token);
+  if (payload?.role) {
+    localStorage.setItem(ROLE_KEY, payload.role);
+  }
+
+  // Pre-warm the module cache; non-blocking, failures are safe to ignore.
+  getModules()
+    .then(setStoredModules)
+    .catch(() => {});
+
   return data;
 };
 
@@ -95,5 +144,36 @@ export const getRecentInsights = (limit = 10) =>
 
 export const getKnowledgeGraph = () =>
   api.get("/knowledge/graph").then((r) => r.data);
+
+// --- Vitruvius / modules ---------------------------------------------------
+
+/** Fetch all firm modules (key, display_name, is_active, activated_at). */
+export const getModules = () =>
+  api.get("/modules/").then((r) => r.data);
+
+/**
+ * Free-form chat with Vitruvius.
+ * Returns { answer, used_provider, used_key_source }.
+ */
+export const askVitruvius = (prompt, projectIds = []) =>
+  api
+    .post("/insights/ask", { prompt, project_ids: projectIds })
+    .then((r) => r.data);
+
+/**
+ * Fetch firm-wide insights (admin-only endpoint).
+ * Returns InsightWithProjectOut[].
+ */
+export const getFirmInsights = (limit = 20) =>
+  api.get("/insights/firm/", { params: { limit } }).then((r) => r.data);
+
+/**
+ * Generate a typed insight for a project.
+ * type ∈ { "progress_summary" | "delay_risk" | "bottleneck" }
+ */
+export const generateInsight = (projectId, type) =>
+  api
+    .post(`/insights/generate/${projectId}`, null, { params: { type } })
+    .then((r) => r.data);
 
 export default api;
