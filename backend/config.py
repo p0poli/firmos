@@ -9,6 +9,20 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     cors_origins: str = "http://localhost:3000"
 
+    # AI providers — system-wide fallback. Empty string means "not set";
+    # the AI service treats either as "no key" and falls back through
+    # firm key -> env key -> stub response.
+    anthropic_api_key: str = ""
+    openai_api_key: str = ""
+
+    # Fernet key for encrypting per-firm AI keys at rest. When unset,
+    # per-firm key storage is disabled (env keys above are still used).
+    encryption_key: str = ""
+
+    # AI request timeout in seconds — provider call gives up after this
+    # so a hung provider can't wedge a request handler.
+    ai_request_timeout: int = 30
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 
