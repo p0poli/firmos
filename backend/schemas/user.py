@@ -12,6 +12,10 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.architect
 
 
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+
 class UserOut(BaseModel):
     id: UUID
     name: str

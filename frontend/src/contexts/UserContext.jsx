@@ -73,10 +73,13 @@ export function UserProvider({ children }) {
     };
   }, []);
 
-  /** True iff the named module is active for this firm. */
+  /**
+   * True iff the named module is active for this firm.
+   * The API returns `module_key` (not `key`) — match on that field.
+   */
   const hasModule = useCallback(
     (key) => {
-      const mod = modules.find((m) => m.key === key);
+      const mod = modules.find((m) => m.module_key === key);
       return mod?.is_active === true;
     },
     [modules]

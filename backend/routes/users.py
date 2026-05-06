@@ -1,9 +1,11 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session as OrmSession
 
 from database import get_db
 from models import User
-from schemas.user import UserCreate, UserOut
+from schemas.user import UserCreate, UserOut, UserRoleUpdate
 from services import auth_service
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -20,6 +22,31 @@ def list_users(
     admin: User = Depends(auth_service.get_current_admin),
 ) -> list[User]:
     return db.query(User).filter(User.firm_id == admin.firm_id).all()
+
+
+@router.patch("/{user_id}/role", response_model=UserOut)
+def update_role(
+    user_id: UUID,
+    payload: UserRoleUpdate,
+    db: OrmSession = Depends(get_db),
+    admin: User = Depends(auth_service.get_current_admin),
+) -> User:
+    """Change a team member's role. Admin only. Cannot change own role."""
+    target = (
+        db.query(User)
+        .filter(User.id == user_id, User.firm_id == admin.firm_id)
+        .first()
+    )
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == admin.id:
+        raise HTTPException(
+            status_code=400, detail="You cannot change your own role"
+        )
+    target.role = payload.role
+    db.commit()
+    db.refresh(target)
+    return target
 
 
 @router.post("/", response_model=UserOut, status_code=status.HTTP_201_CREATED)

@@ -145,6 +145,35 @@ export const getRecentInsights = (limit = 10) =>
 export const getKnowledgeGraph = () =>
   api.get("/knowledge/graph").then((r) => r.data);
 
+// --- users ----------------------------------------------------------------
+
+/** List all users in the caller's firm. Admin only. */
+export const listUsers = () =>
+  api.get("/users/").then((r) => r.data);
+
+/**
+ * Create a new user in the caller's firm. Admin only.
+ * payload: { name, email, password, role }
+ */
+export const createUser = (payload) =>
+  api.post("/users/", payload).then((r) => r.data);
+
+/**
+ * Update a team member's role. Admin only.
+ * role ∈ { "admin" | "project_manager" | "architect" }
+ */
+export const updateUserRole = (userId, role) =>
+  api.patch(`/users/${userId}/role`, { role }).then((r) => r.data);
+
+// --- modules --------------------------------------------------------------
+
+/**
+ * Toggle a firm module on or off. Admin only.
+ * Returns the updated FirmModuleOut.
+ */
+export const updateModule = (moduleKey, isActive) =>
+  api.patch(`/modules/${moduleKey}`, { is_active: isActive }).then((r) => r.data);
+
 // --- Vitruvius / modules ---------------------------------------------------
 
 /** Fetch all firm modules (key, display_name, is_active, activated_at). */

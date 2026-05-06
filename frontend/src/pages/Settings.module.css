@@ -1,11 +1,46 @@
+/* Settings page — 4-tab layout (max 760px, centered by the Layout shell). */
+
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  max-width: 720px;
+  gap: 0;
+  max-width: 760px;
 }
 
-.row {
+/* --- Tab bar ------------------------------------------------------------ */
+
+.tabBar {
+  /* sits flush on the card top edge */
+  margin-bottom: var(--space-6);
+}
+
+/* --- Tab panels --------------------------------------------------------- */
+
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* --- Generic section within a tab ------------------------------------- */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionTitle {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* --- My Account --------------------------------------------------------- */
+
+.accountRow {
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -36,6 +71,14 @@
   font-family: var(--font-mono);
 }
 
+.roleLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* --- Meta table (About section) ---------------------------------------- */
+
 .meta {
   display: flex;
   flex-direction: column;
@@ -61,4 +104,289 @@
   margin: 0;
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
+}
+
+/* --- Admin-only notice (shown to non-admins on restricted tabs) --------- */
+
+.adminOnly {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-10, 40px) var(--space-6);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.adminOnlyIcon {
+  opacity: 0.4;
+  margin-bottom: var(--space-2);
+}
+
+.adminOnlyTitle {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.adminOnlyDesc {
+  font-size: var(--text-sm);
+  max-width: 320px;
+  line-height: var(--leading-normal);
+}
+
+/* --- AI Settings -------------------------------------------------------- */
+
+.providerRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.providerCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  background: var(--color-surface);
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+  text-align: left;
+}
+
+.providerCard:hover {
+  border-color: var(--color-border-strong);
+}
+
+.providerCard.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.providerCardLabel {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.providerCardSub {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fieldLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.fieldInput {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.fieldInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.fieldHint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: var(--leading-normal);
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.saveMsg {
+  font-size: var(--text-sm);
+}
+
+.saveMsg.ok { color: var(--color-success); }
+.saveMsg.err { color: var(--color-danger); }
+
+/* --- Modules ------------------------------------------------------------ */
+
+.moduleList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.moduleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.moduleRow:last-child {
+  border-bottom: none;
+}
+
+.moduleIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.moduleInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.moduleName {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.moduleDesc {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: var(--leading-normal);
+}
+
+.moduleActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+/* --- Team -------------------------------------------------------------- */
+
+.teamList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.teamRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.teamRow:last-child {
+  border-bottom: none;
+}
+
+.teamMeta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.teamName {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teamEmail {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roleSelect {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.roleSelect:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.roleSelect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Invite form -------------------------------------------------------- */
+
+.inviteGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .inviteGrid { grid-template-columns: 1fr; }
+  .providerRow { grid-template-columns: 1fr; }
+}
+
+.inviteSelect {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  box-sizing: border-box;
+}
+
+.inviteSelect:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
