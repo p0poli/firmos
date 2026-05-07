@@ -1,18 +1,28 @@
 """AI analyst — provider-agnostic insight generation with rich context.
 
+Key changes vs. the previous version
+--------------------------------------
+- assemble_context() is now **async** and accepts an optional `query` string.
+  When a query is provided it embeds it via Voyage AI and appends:
+    - top-3 PersonalMemoryChunk hits  (user-private, full content)
+    - top-5 MemoryChunk hits          (anonymised firm knowledge)
+  When query=None (insight generation, legacy callers) no embedding is done
+  and the output is identical to the old serialised-dict behaviour.
+- generate_insight() and ask() are now async; they use asyncio.to_thread()
+  to run the blocking httpx provider calls in a thread pool.
+- The blocking HTTP helpers (_call_anthropic, _call_openai, _run_provider)
+  remain synchronous — they are only ever called via asyncio.to_thread().
+- Internal helpers (_build_structured_ctx, _serialize_ctx) retain their
+  original sync signatures so _stub_response can still receive the ctx dict.
+
 Resolution order for the API key:
   1. Firm's own encrypted key (firm.ai_api_key_encrypted)
   2. System env var (ANTHROPIC_API_KEY / OPENAI_API_KEY)
   3. Stub fallback — deterministic placeholder text prefixed "[stub]"
-     so the demo flow works without keys configured.
-
-generate_insight() is type-driven (progress_summary / delay_risk /
-bottleneck), persists an Insight row, and fires the knowledge-graph
-hook. ask() takes a free-form prompt and returns the answer ephemerally
-— it does not pollute the insights table.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Iterable, Optional
@@ -37,11 +47,14 @@ from models import (
     User,
 )
 from services import encryption, knowledge_graph_service
+from services.embedding_service import embed_text, search_similar
 
 logger = logging.getLogger("uvicorn.error")
 
 
-# --- prompt templates ------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Prompt templates
+# ---------------------------------------------------------------------------
 
 INSIGHT_PROMPTS: dict[str, str] = {
     "progress_summary": (
@@ -60,20 +73,29 @@ INSIGHT_PROMPTS: dict[str, str] = {
     ),
 }
 
-# Models — kept here so swapping a model is a one-line change.
+# Models — one-line change to swap providers.
 ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 OPENAI_MODEL = "gpt-4o"
 
+SYSTEM_PROMPT_BASE = (
+    "You are Vitruvius, an AI analyst embedded in an architectural firm "
+    "management platform. You read structured firm context and produce "
+    "concise, specific insights. Always reference real names from the "
+    "context — task names, team members, project titles. Avoid generic "
+    "advice. Keep responses to 3–5 sentences unless the user explicitly "
+    "asks for a longer breakdown."
+)
 
-# --- key + provider resolution ---------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Key + provider resolution
+# ---------------------------------------------------------------------------
 
 
 def _resolve_provider_and_key(firm: Firm) -> tuple[str, Optional[str], str]:
-    """Pick (provider, api_key, key_source) for a firm.
+    """Pick (provider, api_key, key_source).
 
-    key_source ∈ {"firm", "env", "none"} — useful for the API response
-    so the frontend can show "Using firm key" vs "Using system key" vs
-    "No key configured (stub mode)".
+    key_source ∈ {"firm", "env", "none"}
     """
     provider = (firm.ai_provider or "anthropic").lower()
     if provider not in {"anthropic", "openai"}:
@@ -94,17 +116,15 @@ def _resolve_provider_and_key(firm: Firm) -> tuple[str, Optional[str], str]:
     return provider, None, "none"
 
 
-# --- context assembly ------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Structured context assembly (sync — unchanged from prior version)
+# ---------------------------------------------------------------------------
 
 
 def _serialize_user(u: Optional[User]) -> dict[str, Any]:
     if u is None:
         return {}
-    return {
-        "name": u.name,
-        "role": u.role.value if u.role else None,
-        "email": u.email,
-    }
+    return {"name": u.name, "role": u.role.value if u.role else None, "email": u.email}
 
 
 def _serialize_project(p: Project) -> dict[str, Any]:
@@ -117,29 +137,22 @@ def _serialize_project(p: Project) -> dict[str, Any]:
     }
 
 
-def assemble_context(
+def _build_structured_ctx(
     db: OrmSession,
     firm: Firm,
     user: User,
     project: Optional[Project] = None,
 ) -> dict[str, Any]:
-    """Build the context_package the prompt will reference.
-
-    Mirrors the structure called out in the spec:
-      firm, user, project (optional), tasks, sessions, check_results,
-      knowledge_nodes, similar_projects, recent_insights.
-    """
+    """Build the raw context dict (sync).  Identical to the old assemble_context."""
     ctx: dict[str, Any] = {
         "firm": {"name": firm.name},
         "user": _serialize_user(user),
     }
-
     if project is None:
         return ctx
 
     ctx["project"] = _serialize_project(project)
 
-    # Tasks for this project, with assignee name when present.
     tasks = (
         db.query(Task, User.name.label("assignee_name"))
         .outerjoin(User, Task.assigned_user_id == User.id)
@@ -157,7 +170,6 @@ def assemble_context(
         for t, assignee_name in tasks
     ]
 
-    # Last 10 sessions on this project.
     sessions = (
         db.query(Session, User.name.label("user_name"))
         .join(User, Session.user_id == User.id)
@@ -175,7 +187,6 @@ def assemble_context(
         for s, user_name in sessions
     ]
 
-    # Last 5 check results — joined through ModelEvent to filter by project.
     checks = (
         db.query(CheckResult)
         .join(ModelEvent, CheckResult.model_event_id == ModelEvent.id)
@@ -194,7 +205,6 @@ def assemble_context(
         for c in checks
     ]
 
-    # KnowledgeNodes connected to the project's KnowledgeNode by any edge.
     project_node = (
         db.query(KnowledgeNode)
         .filter(
@@ -206,24 +216,22 @@ def assemble_context(
     related_nodes: list[KnowledgeNode] = []
     project_tag_ids: set[UUID] = set()
     if project_node:
-        outbound_target_ids = [
-            row[0]
-            for row in db.query(KnowledgeEdge.target_node_id)
+        outbound = [
+            r[0]
+            for r in db.query(KnowledgeEdge.target_node_id)
             .filter(KnowledgeEdge.source_node_id == project_node.id)
             .all()
         ]
-        inbound_source_ids = [
-            row[0]
-            for row in db.query(KnowledgeEdge.source_node_id)
+        inbound = [
+            r[0]
+            for r in db.query(KnowledgeEdge.source_node_id)
             .filter(KnowledgeEdge.target_node_id == project_node.id)
             .all()
         ]
-        connected_ids = list({*outbound_target_ids, *inbound_source_ids})
-        if connected_ids:
+        connected = list({*outbound, *inbound})
+        if connected:
             related_nodes = (
-                db.query(KnowledgeNode)
-                .filter(KnowledgeNode.id.in_(connected_ids))
-                .all()
+                db.query(KnowledgeNode).filter(KnowledgeNode.id.in_(connected)).all()
             )
             project_tag_ids = {
                 n.reference_id
@@ -240,54 +248,48 @@ def assemble_context(
         for n in related_nodes
     ]
 
-    # Similar projects: other projects in the firm that share at least
-    # one tag with this one. Up to 3.
     similar: list[Project] = []
     if project_tag_ids and project_node:
-        # Find tag KnowledgeNodes for this project's tags, then walk
-        # back to the project nodes attached to those tag nodes.
-        tag_node_id_rows = (
-            db.query(KnowledgeNode.id)
+        tag_node_ids = [
+            r[0]
+            for r in db.query(KnowledgeNode.id)
             .filter(
                 KnowledgeNode.node_type == NodeType.tag,
                 KnowledgeNode.reference_id.in_(project_tag_ids),
             )
             .all()
-        )
-        tag_node_ids = [row[0] for row in tag_node_id_rows]
+        ]
         if tag_node_ids:
-            sibling_node_id_rows = (
-                db.query(KnowledgeEdge.source_node_id)
+            sibling_ids = [
+                r[0]
+                for r in db.query(KnowledgeEdge.source_node_id)
                 .filter(KnowledgeEdge.target_node_id.in_(tag_node_ids))
                 .distinct()
                 .all()
-            )
-            sibling_node_ids = [
-                row[0]
-                for row in sibling_node_id_rows
-                if row[0] != project_node.id
+                if r[0] != project_node.id
             ]
-            if sibling_node_ids:
-                sibling_project_refs = (
-                    db.query(KnowledgeNode.reference_id)
+            if sibling_ids:
+                sibling_refs = [
+                    r[0]
+                    for r in db.query(KnowledgeNode.reference_id)
                     .filter(
-                        KnowledgeNode.id.in_(sibling_node_ids),
+                        KnowledgeNode.id.in_(sibling_ids),
                         KnowledgeNode.node_type == NodeType.project,
                     )
                     .all()
-                )
-                sibling_project_ids = [r[0] for r in sibling_project_refs]
-                if sibling_project_ids:
+                ]
+                if sibling_refs:
                     similar = (
                         db.query(Project)
                         .filter(
-                            Project.id.in_(sibling_project_ids),
+                            Project.id.in_(sibling_refs),
                             Project.firm_id == firm.id,
                             Project.id != project.id,
                         )
                         .limit(3)
                         .all()
                     )
+
     ctx["similar_projects"] = [
         {
             "name": p.name,
@@ -299,7 +301,6 @@ def assemble_context(
         for p in similar
     ]
 
-    # Last 3 insights already generated for this project.
     recent = (
         db.query(Insight)
         .filter(Insight.project_id == project.id)
@@ -319,13 +320,9 @@ def assemble_context(
     return ctx
 
 
-def serialize_context(ctx: dict[str, Any]) -> str:
-    """Render the context_package as a structured plain-text block.
-
-    Section headings + bullets — easier for an LLM to read than JSON
-    and shorter token-wise than pretty-printed JSON.
-    """
-    lines: list[str] = ["FIRM CONTEXT", "=" * 12, ""]
+def _serialize_ctx(ctx: dict[str, Any]) -> str:
+    """Render the structured context dict as a plain-text block (sync)."""
+    lines: list[str] = []
 
     firm = ctx.get("firm") or {}
     if firm:
@@ -366,18 +363,16 @@ def serialize_context(ctx: dict[str, Any]) -> str:
 
     sessions = ctx.get("sessions") or []
     if sessions:
-        lines.append(f"Recent sessions on this project (last {len(sessions)}):")
+        lines.append(f"Recent sessions ({len(sessions)}):")
         for s in sessions:
             secs = s.get("duration_seconds")
             duration = f"{secs // 60} min" if secs else "active"
-            lines.append(
-                f"  - {s.get('user')} — {duration} on {s.get('date', '—')}"
-            )
+            lines.append(f"  - {s.get('user')} — {duration} on {s.get('date', '—')}")
         lines.append("")
 
     checks = ctx.get("check_results") or []
     if checks:
-        lines.append(f"Recent compliance checks (last {len(checks)}):")
+        lines.append(f"Recent compliance checks ({len(checks)}):")
         for c in checks:
             issue = c.get("first_issue")
             issue_str = f' — first issue: "{issue}"' if issue else ""
@@ -389,28 +384,23 @@ def serialize_context(ctx: dict[str, Any]) -> str:
 
     nodes = ctx.get("knowledge_nodes") or []
     if nodes:
-        lines.append(f"Linked knowledge graph nodes ({len(nodes)}):")
+        lines.append(f"Linked knowledge nodes ({len(nodes)}):")
         for n in nodes:
             md = n.get("metadata") or {}
-            md_str = ", ".join(
-                f"{k}={v}" for k, v in md.items() if v not in (None, "")
-            )
-            md_part = f" [{md_str}]" if md_str else ""
-            lines.append(f"  - {n.get('node_type')}: {n.get('label')}{md_part}")
+            md_str = ", ".join(f"{k}={v}" for k, v in md.items() if v not in (None, ""))
+            lines.append(f"  - {n.get('node_type')}: {n.get('label')}" + (f" [{md_str}]" if md_str else ""))
         lines.append("")
 
     similar = ctx.get("similar_projects") or []
     if similar:
-        lines.append("Similar projects in this firm (up to 3):")
+        lines.append("Similar projects (up to 3):")
         for sp in similar:
-            lines.append(
-                f"  - {sp.get('name')} — {sp.get('status')} ({sp.get('outcome')})"
-            )
+            lines.append(f"  - {sp.get('name')} — {sp.get('status')} ({sp.get('outcome')})")
         lines.append("")
 
     recent = ctx.get("recent_insights") or []
     if recent:
-        lines.append(f"Existing insights on this project (last {len(recent)}):")
+        lines.append(f"Existing insights ({len(recent)}):")
         for i in recent:
             content = (i.get("content") or "")[:200]
             lines.append(f"  - [{i.get('type')}] {content}")
@@ -419,17 +409,81 @@ def serialize_context(ctx: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-# --- HTTP layer ------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Upgraded async context assembler (Step 4)
+# ---------------------------------------------------------------------------
 
 
-SYSTEM_PROMPT_BASE = (
-    "You are Vitruvius, an AI analyst embedded in an architectural firm "
-    "management platform. You read structured firm context and produce "
-    "concise, specific insights. Always reference real names from the "
-    "context — task names, team members, project titles. Avoid generic "
-    "advice. Keep responses to 3–5 sentences unless the user explicitly "
-    "asks for a longer breakdown."
-)
+async def assemble_context(
+    db: OrmSession,
+    firm: Firm,
+    user: User,
+    project: Optional[Project] = None,
+    query: Optional[str] = None,
+) -> str:
+    """Build the full context string for the AI system prompt.
+
+    Format
+    ------
+    === FIRM CONTEXT ===
+    <structured data>
+
+    === YOUR PERSONAL MEMORY (relevant to this query) ===   # only when query
+    <top-3 PersonalMemoryChunk hits>
+
+    === FIRM KNOWLEDGE (relevant to this query) ===          # only when query
+    <top-5 anonymised MemoryChunk hits>
+
+    Memory sections are omitted entirely when `query` is None (e.g. during
+    scheduled insight generation where no user query string is available).
+    """
+    # 1. Structured data (always present)
+    ctx = _build_structured_ctx(db, firm, user, project)
+    parts: list[str] = ["=== FIRM CONTEXT ===", _serialize_ctx(ctx)]
+
+    # 2 & 3. Memory retrieval (only when the caller has a user query)
+    if query:
+        query_vec = await embed_text(query)
+
+        if query_vec is not None:
+            # Personal memory — private to this user, full content
+            personal_hits = await search_similar(
+                db,
+                query_vec,
+                table="personal_memory_chunks",
+                user_id=user.id,
+                limit=3,
+                threshold=0.7,
+            )
+            parts.append("\n=== YOUR PERSONAL MEMORY (relevant to this query) ===")
+            if personal_hits:
+                for hit in personal_hits:
+                    parts.append(f"  • {hit['content']}")
+            else:
+                parts.append("  No personal memory matches for this query.")
+
+            # Firm knowledge — anonymised, firm-wide pool
+            firm_hits = await search_similar(
+                db,
+                query_vec,
+                table="memory_chunks",
+                firm_id=firm.id,
+                limit=5,
+                threshold=0.7,
+            )
+            parts.append("\n=== FIRM KNOWLEDGE (relevant to this query) ===")
+            if firm_hits:
+                for hit in firm_hits:
+                    parts.append(f"  • {hit['content']}")
+            else:
+                parts.append("  No firm knowledge matches for this query.")
+
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# HTTP provider calls (sync — called via asyncio.to_thread)
+# ---------------------------------------------------------------------------
 
 
 def _call_anthropic(api_key: str, system: str, prompt: str) -> str:
@@ -445,11 +499,7 @@ def _call_anthropic(api_key: str, system: str, prompt: str) -> str:
         "content-type": "application/json",
     }
     with httpx.Client(timeout=settings.ai_request_timeout) as client:
-        resp = client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers=headers,
-            json=payload,
-        )
+        resp = client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
     parts = [
@@ -469,26 +519,16 @@ def _call_openai(api_key: str, system: str, prompt: str) -> str:
         ],
         "max_tokens": 600,
     }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "content-type": "application/json",
-    }
+    headers = {"Authorization": f"Bearer {api_key}", "content-type": "application/json"}
     with httpx.Client(timeout=settings.ai_request_timeout) as client:
-        resp = client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            json=payload,
-        )
+        resp = client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
     return data["choices"][0]["message"]["content"].strip()
 
 
 def _stub_response(insight_type: str, ctx: dict[str, Any]) -> str:
-    """Deterministic placeholder when no API key is configured.
-
-    Prefixed with [stub] so it's obvious the AI didn't actually run.
-    """
+    """Deterministic placeholder when no API key is configured."""
     p = ctx.get("project") or {}
     tasks = ctx.get("tasks") or []
     total = len(tasks)
@@ -497,25 +537,17 @@ def _stub_response(insight_type: str, ctx: dict[str, Any]) -> str:
 
     if insight_type == "progress_summary":
         return (
-            f"[stub] {p.get('name', 'Project')}: {done}/{total} tasks complete "
-            f"({pct}%). This placeholder appears because no AI key is "
-            f"configured. Set ANTHROPIC_API_KEY or a per-firm key in Settings "
-            f"to enable real summaries."
+            f"[stub] {p.get('name', 'Project')}: {done}/{total} tasks complete ({pct}%). "
+            f"Set ANTHROPIC_API_KEY (or a firm key in Settings) for real summaries."
         )
     if insight_type == "delay_risk":
         if p.get("deadline") and pct < 50:
-            return (
-                f"[stub] Less than half of tasks complete with deadline "
-                f"{p['deadline']} — possible delay risk."
-            )
+            return f"[stub] Less than half of tasks complete with deadline {p['deadline']} — possible delay risk."
         return "[stub] No obvious delay risk based on task counts alone."
     if insight_type == "bottleneck":
         review_count = sum(1 for t in tasks if t.get("status") == "review")
         if review_count:
-            return (
-                f"[stub] {review_count} task(s) sitting in review may be a "
-                f"bottleneck."
-            )
+            return f"[stub] {review_count} task(s) sitting in review may be a bottleneck."
         return "[stub] No bottlenecks detected from task statuses alone."
     return "[stub] No insight generated."
 
@@ -526,7 +558,7 @@ def _run_provider(
     system: str,
     prompt: str,
 ) -> Optional[str]:
-    """Call the provider; return None on any failure so the caller can stub."""
+    """Call the provider synchronously; return None on any failure."""
     if not api_key:
         return None
     try:
@@ -539,34 +571,35 @@ def _run_provider(
     return None
 
 
-# --- public surface --------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Public async surface
+# ---------------------------------------------------------------------------
 
 
-def generate_insight(
+async def generate_insight(
     db: OrmSession,
     firm: Firm,
     user: User,
     project: Project,
     insight_type: str,
 ) -> Insight:
-    """Generate one Insight of the requested type, persist, and return it.
-
-    insight_type is one of the keys of INSIGHT_PROMPTS.
-    """
+    """Generate one Insight of the requested type, persist, and return it."""
     if insight_type not in INSIGHT_PROMPTS:
         raise ValueError(
             f"Unknown insight type '{insight_type}'. "
             f"Expected one of: {', '.join(INSIGHT_PROMPTS)}"
         )
 
-    ctx = assemble_context(db, firm, user, project)
-    rendered_ctx = serialize_context(ctx)
-    provider, key, _source = _resolve_provider_and_key(firm)
+    # Insight generation is not query-driven → no memory retrieval (query=None).
+    ctx = _build_structured_ctx(db, firm, user, project)
+    context_str = "=== FIRM CONTEXT ===\n" + _serialize_ctx(ctx)
 
-    system = SYSTEM_PROMPT_BASE + "\n\n" + rendered_ctx
+    provider, key, _source = _resolve_provider_and_key(firm)
+    system = SYSTEM_PROMPT_BASE + "\n\n" + context_str
     prompt = INSIGHT_PROMPTS[insight_type]
 
-    answer = _run_provider(provider, key, system, prompt)
+    # Run blocking HTTP call in a thread so we don't stall the event loop.
+    answer = await asyncio.to_thread(_run_provider, provider, key, system, prompt)
     if answer is None:
         answer = _stub_response(insight_type, ctx)
 
@@ -582,17 +615,18 @@ def generate_insight(
     return insight
 
 
-def ask(
+async def ask(
     db: OrmSession,
     firm: Firm,
     user: User,
     prompt: str,
     project_ids: Optional[Iterable[UUID]] = None,
 ) -> dict[str, Any]:
-    """Free-form chat. Not persisted — returned to the caller and
-    discarded. Context is firm-wide unless project_ids is provided, in
-    which case the first project is fully expanded; the rest are just
-    referenced by name in a future iteration."""
+    """Free-form chat — context-aware, memory-enriched, ephemeral.
+
+    The user's prompt is used as the semantic query so personal and firm
+    memories relevant to the question are automatically included.
+    """
     project: Optional[Project] = None
     project_ids = list(project_ids or [])
     if project_ids:
@@ -602,36 +636,30 @@ def ask(
             .first()
         )
 
-    ctx = assemble_context(db, firm, user, project)
-    rendered_ctx = serialize_context(ctx)
+    # Pass prompt as query → triggers memory retrieval.
+    context_str = await assemble_context(db, firm, user, project, query=prompt)
     provider, key, source = _resolve_provider_and_key(firm)
+    system = SYSTEM_PROMPT_BASE + "\n\n" + context_str
 
-    system = SYSTEM_PROMPT_BASE + "\n\n" + rendered_ctx
-    answer = _run_provider(provider, key, system, prompt)
+    answer = await asyncio.to_thread(_run_provider, provider, key, system, prompt)
     if answer is None:
         answer = (
             "[stub] Vitruvius can't answer that without an AI key. Configure "
             "ANTHROPIC_API_KEY (or a firm key in Settings) and try again."
         )
 
-    return {
-        "answer": answer,
-        "used_provider": provider,
-        "used_key_source": source,
-    }
+    return {"answer": answer, "used_provider": provider, "used_key_source": source}
 
 
-# --- legacy compatibility shim --------------------------------------------
+# ---------------------------------------------------------------------------
+# Legacy compatibility shim (async)
+# ---------------------------------------------------------------------------
 
 
-def generate_insights(db: OrmSession, project_id: UUID) -> list[Insight]:
-    """Back-compat for the old endpoint signature.
+async def generate_insights(db: OrmSession, project_id: UUID) -> list[Insight]:
+    """Back-compat for pre-typed callers.
 
-    The new typed endpoint lives at POST /insights/generate/{id}?type=...
-    — this function fires the progress_summary and delay_risk types so
-    that existing callers (the lifespan auto-populator, any old tests)
-    keep producing something useful. Bottleneck is omitted to match
-    the original behaviour.
+    Fires progress_summary + delay_risk (if a deadline exists).
     """
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -640,12 +668,9 @@ def generate_insights(db: OrmSession, project_id: UUID) -> list[Insight]:
     if not firm:
         return []
     user = (
-        db.query(User)
-        .filter(User.firm_id == firm.id)
-        .order_by(User.email)
-        .first()
+        db.query(User).filter(User.firm_id == firm.id).order_by(User.email).first()
     )
-    out = [generate_insight(db, firm, user, project, "progress_summary")]
+    out = [await generate_insight(db, firm, user, project, "progress_summary")]
     if project.deadline:
-        out.append(generate_insight(db, firm, user, project, "delay_risk"))
+        out.append(await generate_insight(db, firm, user, project, "delay_risk"))
     return out

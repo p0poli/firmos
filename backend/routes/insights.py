@@ -98,7 +98,7 @@ def firm_insights(
 
 
 @router.post("/generate/{project_id}", response_model=list[InsightOut])
-def generate(
+async def generate(
     project_id: UUID,
     type: Optional[str] = Query(
         default=None,
@@ -122,9 +122,7 @@ def generate(
     firm = db.query(Firm).filter(Firm.id == user.firm_id).first()
 
     if type is None:
-        # Back-compat path — the lifespan auto-populator and pre-step-3
-        # callers used this shape.
-        insights = ai_service.generate_insights(db, project_id)
+        insights = await ai_service.generate_insights(db, project_id)
     else:
         if type not in ai_service.INSIGHT_PROMPTS:
             raise HTTPException(
@@ -134,30 +132,28 @@ def generate(
                     f"{', '.join(ai_service.INSIGHT_PROMPTS)}"
                 ),
             )
-        insights = [
-            ai_service.generate_insight(db, firm, user, project, type)
-        ]
+        insights = [await ai_service.generate_insight(db, firm, user, project, type)]
 
     db.commit()
     return insights
 
 
 @router.post("/ask", response_model=AskResponse)
-def ask_vitruvius(
+async def ask_vitruvius(
     payload: AskRequest,
     db: OrmSession = Depends(get_db),
     user: User = Depends(auth_service.get_current_user),
 ) -> AskResponse:
-    """Free-form chat with the AI — context-aware, ephemeral.
+    """Free-form chat with the AI — context-aware, memory-enriched, ephemeral.
 
-    The answer is returned to the caller and not persisted (no Insight
-    row is created). Pass `project_ids` to scope the context to one or
-    more of the user's projects.
+    The answer is returned to the caller and not persisted (no Insight row
+    is created). Pass `project_ids` to scope the context to one or more
+    projects. The prompt is used as the semantic query for memory retrieval.
     """
     if not payload.prompt or not payload.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
     firm = db.query(Firm).filter(Firm.id == user.firm_id).first()
-    result = ai_service.ask(
+    result = await ai_service.ask(
         db,
         firm,
         user,
