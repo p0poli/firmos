@@ -27,6 +27,13 @@ import {
   setStoredModules,
 } from "../api";
 
+/** Persist the canonical role returned by /users/me to localStorage. */
+function syncRole(userObj) {
+  if (userObj?.role) {
+    localStorage.setItem("firmos_role", userObj.role);
+  }
+}
+
 const UserContext = createContext(null);
 
 export function UserProvider({ children }) {
@@ -43,7 +50,9 @@ export function UserProvider({ children }) {
     try {
       const [u, mods] = await Promise.all([getMe(), getModules()]);
       setUser(u);
-      setRole(getRole());
+      // /users/me is the DB source of truth — prefer it over the JWT cache.
+      syncRole(u);
+      setRole(u?.role ?? getRole());
       setModulesState(mods);
       setStoredModules(mods);
     } catch (err) {
@@ -57,15 +66,21 @@ export function UserProvider({ children }) {
     let cancelled = false;
     Promise.allSettled([getMe(), getModules()]).then(([meR, modsR]) => {
       if (cancelled) return;
-      if (meR.status === "fulfilled") setUser(meR.value);
-      else setError(meR.reason);
+      if (meR.status === "fulfilled") {
+        const u = meR.value;
+        setUser(u);
+        // Use the role from the DB (/users/me) as the canonical value;
+        // write it back to localStorage so subsequent renders are instant.
+        syncRole(u);
+        setRole(u?.role ?? getRole());
+      } else {
+        setError(meR.reason);
+      }
 
       if (modsR.status === "fulfilled") {
         setModulesState(modsR.value);
         setStoredModules(modsR.value);
       }
-      // Sync role from localStorage (may have been written by login()).
-      setRole(getRole());
       setLoading(false);
     });
     return () => {

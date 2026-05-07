@@ -17,14 +17,22 @@ def login(payload: LoginRequest, db: OrmSession = Depends(get_db)) -> TokenRespo
     if not user or not auth_service.verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    # Read the role value NOW — before db.commit() which expires all ORM
+    # objects (expire_on_commit=True is the SQLAlchemy default). Accessing
+    # user.role after the commit would trigger a lazy-reload whose result
+    # may not match what was just loaded, producing a wrong JWT claim.
+    role_value = user.role.value if user.role else None
+    import logging as _log
+    _log.getLogger("uvicorn.error").info(
+        "JWT role for %s: db_role=%r role_value=%r", user.email, user.role, role_value
+    )
+
     sess = Session(user_id=user.id, login_time=datetime.utcnow())
     db.add(sess)
     db.commit()
     db.refresh(sess)
 
-    token = auth_service.create_access_token(
-        str(user.id), role=user.role.value if user.role else None
-    )
+    token = auth_service.create_access_token(str(user.id), role=role_value)
     return TokenResponse(access_token=token, session_id=str(sess.id))
 
 
