@@ -53,17 +53,24 @@ async def lifespan(app: FastAPI):
 
         if user_count == 0:
             logger.info("No users found — running first-boot seed.")
-            seed()
         else:
-            logger.info("Users present (%d) — skipping seed.", user_count)
+            logger.info("Users present (%d) — re-syncing seed.", user_count)
+        # seed() is fully idempotent: always run it so the admin password +
+        # role stays in sync with env vars across redeploys.
+        seed()
 
         if project_count == 0:
-            logger.info("No projects found — running first-boot demo populator.")
-            populate_demo()
+            logger.info("No projects found — running demo populator.")
         else:
             logger.info(
-                "Projects present (%d) — skipping demo populator.", project_count
+                "Projects present (%d) — re-running demo populator for role sync.",
+                project_count,
             )
+        # populate_demo() is fully idempotent (find-or-create everywhere) so
+        # running it on every boot is safe. This ensures demo-user roles stay
+        # in sync with the spec (e.g. jane → project_manager) even after a
+        # database that predates the role-reconciliation logic.
+        populate_demo()
     except SQLAlchemyError as exc:
         # Don't crash the app if the DB isn't reachable or migrations haven't
         # run yet; the operator can still hit /health and investigate.

@@ -75,8 +75,13 @@ def seed() -> None:
             db.commit()
             print(f"Created admin: {admin_email} (password: {admin_password})")
         else:
+            # Always re-sync role + password so the demo stays in a known
+            # state across redeploys (e.g. if an earlier seed used a
+            # different SEED_ADMIN_PASSWORD or the row was drifted).
+            admin.role = UserRole.admin
+            admin.hashed_password = hash_password(admin_password)
             db.commit()
-            print(f"Admin exists: {admin_email}")
+            print(f"Admin synced: {admin_email} (password reset to env default)")
     finally:
         db.close()
 
