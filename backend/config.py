@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # so a hung provider can't wedge a request handler.
     ai_request_timeout: int = 30
 
+    # Voyage AI — used for semantic embeddings in the memory layer.
+    # Sign up at https://www.voyageai.com to obtain a key.
+    voyage_api_key: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 

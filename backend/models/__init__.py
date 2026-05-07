@@ -11,6 +11,9 @@ from .insight import Insight, InsightType
 from .tag import Tag, TagCategory
 from .knowledge_node import KnowledgeNode, NodeType
 from .knowledge_edge import KnowledgeEdge, RelationshipType
+from .conversation_message import ConversationMessage
+from .memory_chunk import MemoryChunk
+from .personal_memory_chunk import PersonalMemoryChunk
 
 __all__ = [
     "Firm",
@@ -40,4 +43,7 @@ __all__ = [
     "NodeType",
     "KnowledgeEdge",
     "RelationshipType",
+    "ConversationMessage",
+    "MemoryChunk",
+    "PersonalMemoryChunk",
 ]
