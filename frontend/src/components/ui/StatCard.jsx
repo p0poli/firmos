@@ -18,14 +18,36 @@ export function StatCard({
   icon,
   trend,
   trendIntent,
+  /** Native tooltip shown on hover (uses title attribute — no extra library). */
+  tooltip,
+  /** When provided the card becomes interactive: pointer cursor + hover lift. */
+  onClick,
   className = "",
 }) {
   const intent =
     trendIntent ||
     (trend?.direction === "up" ? "positive" : trend?.direction === "down" ? "negative" : "neutral");
 
+  const interactive = Boolean(onClick);
+
   return (
-    <div className={`${styles.statCard} ${className}`.trim()}>
+    <div
+      className={`${styles.statCard} ${interactive ? styles.interactive : ""} ${className}`.trim()}
+      onClick={onClick}
+      title={tooltip}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick(e);
+              }
+            }
+          : undefined
+      }
+    >
       <div className={styles.row}>
         <span className={styles.label}>{label}</span>
         {icon && <span className={styles.icon}>{icon}</span>}

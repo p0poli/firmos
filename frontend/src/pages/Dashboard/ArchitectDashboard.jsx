@@ -33,6 +33,7 @@ import {
   ProgressBar,
   Skeleton,
   SkeletonGroup,
+  StatCard,
 } from "../../components/ui";
 import { useUser } from "../../contexts/UserContext";
 import {
@@ -86,6 +87,7 @@ function variantColor(variant) {
 }
 
 export default function ArchitectDashboard() {
+  const navigate = useNavigate();
   const { user } = useUser();
   const [projects, setProjects]           = useState(null);
   const [tasksByProject, setTasksByProject] = useState(null);
@@ -154,6 +156,22 @@ export default function ArchitectDashboard() {
     [projects]
   );
 
+  // Tasks past due date and not completed
+  const overdueTasksCount = useMemo(() => {
+    if (!tasksByProject) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let count = 0;
+    for (const tasks of Object.values(tasksByProject)) {
+      for (const t of tasks) {
+        if (t.status === "done") continue;
+        if (!t.due_date) continue;
+        if (new Date(t.due_date) < today) count++;
+      }
+    }
+    return count;
+  }, [tasksByProject]);
+
   return (
     <div className={styles.page}>
       {error && (
@@ -162,6 +180,35 @@ export default function ArchitectDashboard() {
           <span style={{ color: "var(--color-text-secondary)" }}>{error}</span>
         </Card>
       )}
+
+      {/* --- Stat row --------------------------------------------------- */}
+      <div className={styles.statsRow}>
+        <StatCard
+          label="Active projects"
+          value={activeProjects === null ? "—" : activeProjects.length}
+          tooltip="Projects currently in active status"
+          onClick={() => navigate("/portfolio?status=active")}
+        />
+        <StatCard
+          label="Due this week"
+          value={myTasksDueSoon === null ? "—" : myTasksDueSoon.length}
+          tooltip={`Tasks assigned to you due in the next ${HORIZON_DAYS} days`}
+          onClick={() => navigate("/tasks")}
+        />
+        <StatCard
+          label="Tasks overdue"
+          value={overdueTasksCount === null ? "—" : overdueTasksCount}
+          tooltip="Tasks past their due date that are not yet completed"
+          trendIntent={overdueTasksCount > 0 ? "negative" : "neutral"}
+          onClick={() => navigate("/tasks?filter=overdue")}
+        />
+        <StatCard
+          label="AI insights"
+          value={insights === null ? "—" : insights.length}
+          tooltip="AI-generated signals across your projects"
+          onClick={() => navigate("/portfolio")}
+        />
+      </div>
 
       {/* --- Section 1: My Work ------------------------------------------ */}
       <section className={styles.row2}>

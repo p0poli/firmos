@@ -9,6 +9,7 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "../../contexts/UserContext";
 import {
   AlertOctagon,
   AlertTriangle,
@@ -53,6 +54,8 @@ const INSIGHT_ICON = {
 };
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const { modules } = useUser();
   const [projects, setProjects] = useState(null);
   const [tasksByProject, setTasksByProject] = useState(null);
   const [insights, setInsights] = useState(null);
@@ -100,12 +103,27 @@ export default function AdminDashboard() {
     [projects]
   );
 
-  const openRisks = useMemo(() => {
-    if (!insights) return null;
-    return insights.filter(
-      (i) => i.type === "delay_risk" || i.type === "bottleneck"
-    ).length;
-  }, [insights]);
+  // Tasks past due date and not completed
+  const overdueTasksCount = useMemo(() => {
+    if (!tasksByProject) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let count = 0;
+    for (const tasks of Object.values(tasksByProject)) {
+      for (const t of tasks) {
+        if (t.status === "done") continue;
+        if (!t.due_date) continue;
+        if (new Date(t.due_date) < today) count++;
+      }
+    }
+    return count;
+  }, [tasksByProject]);
+
+  // Modules currently enabled for the firm
+  const activeModulesCount = useMemo(
+    () => modules.filter((m) => m.is_active).length,
+    [modules]
+  );
 
   return (
     <div className={styles.page}>
@@ -122,22 +140,30 @@ export default function AdminDashboard() {
           label="Active projects"
           value={activeProjects === null ? "—" : activeProjects.length}
           icon={<FolderOpen />}
+          tooltip="Projects currently in active status across the firm"
+          onClick={() => navigate("/portfolio?status=active")}
         />
         <StatCard
           label="Team online"
           value={activeSessions === null ? "—" : activeSessions.length}
           icon={<Users />}
+          tooltip="Team members with an active session right now"
+          onClick={() => navigate("/portfolio")}
         />
         <StatCard
-          label="Total insights"
-          value={insights === null ? "—" : insights.length}
-          icon={<BarChart3 />}
-        />
-        <StatCard
-          label="Open risks"
-          value={openRisks === null ? "—" : openRisks}
+          label="Tasks overdue"
+          value={overdueTasksCount === null ? "—" : overdueTasksCount}
           icon={<AlertTriangle />}
-          trendIntent={openRisks > 0 ? "negative" : "neutral"}
+          tooltip="Tasks past their due date that are not yet completed"
+          trendIntent={overdueTasksCount > 0 ? "negative" : "neutral"}
+          onClick={() => navigate("/tasks?filter=overdue")}
+        />
+        <StatCard
+          label="Modules active"
+          value={activeModulesCount}
+          icon={<BarChart3 />}
+          tooltip="Vitruvius Connect modules currently enabled for your firm"
+          onClick={() => navigate("/settings?tab=modules")}
         />
       </div>
 

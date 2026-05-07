@@ -26,6 +26,7 @@ import {
   ProgressBar,
   Skeleton,
   SkeletonGroup,
+  StatCard,
 } from "../../components/ui";
 import { LockedModule } from "../../components/LockedModule";
 import { useUser } from "../../contexts/UserContext";
@@ -81,6 +82,7 @@ function variantColor(variant) {
 }
 
 export default function ProjectManagerDashboard() {
+  const navigate = useNavigate();
   const { user, hasModule } = useUser();
   const revitActive = hasModule("revit_connect");
 
@@ -149,6 +151,22 @@ export default function ProjectManagerDashboard() {
     return () => { cancelled = true; };
   }, [projects]);
 
+  // Tasks past due date and not completed (across all loaded projects)
+  const overdueTasksCount = useMemo(() => {
+    if (!tasksByProject) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let count = 0;
+    for (const tasks of Object.values(tasksByProject)) {
+      for (const t of tasks) {
+        if (t.status === "done") continue;
+        if (!t.due_date) continue;
+        if (new Date(t.due_date) < today) count++;
+      }
+    }
+    return count;
+  }, [tasksByProject]);
+
   // Tasks assigned to this user, due within HORIZON_DAYS
   const projectsById = useMemo(() => {
     if (!projects) return {};
@@ -182,6 +200,36 @@ export default function ProjectManagerDashboard() {
           <span style={{ color: "var(--color-text-secondary)" }}>{error}</span>
         </Card>
       )}
+
+      {/* --- Stat row --------------------------------------------------- */}
+      <div className={styles.statsRow}>
+        <StatCard
+          label="Active projects"
+          value={projects === null ? "—" : projects.length}
+          tooltip="Your active projects across the firm"
+          onClick={() => navigate("/portfolio?status=active")}
+        />
+        <StatCard
+          label="Due this week"
+          value={myTasksDueSoon === null ? "—" : myTasksDueSoon.length}
+          tooltip={`Tasks assigned to you due in the next ${HORIZON_DAYS} days`}
+          onClick={() => navigate("/tasks")}
+        />
+        <StatCard
+          label="Tasks overdue"
+          value={overdueTasksCount === null ? "—" : overdueTasksCount}
+          tooltip="Tasks past their due date that are not yet completed"
+          trendIntent={overdueTasksCount > 0 ? "negative" : "neutral"}
+          onClick={() => navigate("/tasks?filter=overdue")}
+        />
+        <StatCard
+          label="Risk alerts"
+          value={bottlenecks === null ? "—" : bottlenecks.length}
+          tooltip="Delay risks and bottlenecks detected across your projects"
+          trendIntent={bottlenecks.length > 0 ? "negative" : "neutral"}
+          onClick={() => navigate("/portfolio")}
+        />
+      </div>
 
       {/* --- Bottleneck alerts ------------------------------------------ */}
       {bottlenecks.length > 0 && (
