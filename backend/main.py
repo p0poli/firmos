@@ -11,6 +11,7 @@ from models import Project, User
 from populate_demo import populate as populate_demo
 from routes import (
     auth,
+    conversations,
     debug,
     files,
     insights,
@@ -91,6 +92,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(conversations.router)
 app.include_router(debug.router)
 app.include_router(users.router)
 app.include_router(projects.router)
