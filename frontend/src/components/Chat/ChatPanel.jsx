@@ -2,18 +2,33 @@
  * ChatPanel — the 320 px right-side chat drawer.
  *
  * Layout (top → bottom inside a flex column):
- *   1. Header   — "Vitruvius" wordmark + scope indicator + close [X]
- *   2. Messages — scrollable, flex-grow; user right, assistant left
- *   3. Memory share bar — shown for the last assistant message only
- *   4. Input area — auto-resize textarea + send button
+ *   1. Header      — "Vitruvius" wordmark + scope indicator + close [X]
+ *   2. Messages    — scrollable, flex-grow; user right, assistant left
+ *   3. Sharing bar — shown for the last assistant message only
+ *   4. Input area  — auto-resize textarea + send button
+ *
+ * Sharing model
+ * -------------
+ * Every assistant message is automatically shared to firm memory when it
+ * arrives (handled in ChatContext.sendMessage). The sharing bar lets the
+ * user choose between two modes:
+ *
+ *   "Shared"            (default, green, Users icon)
+ *     Visible to your firm, attributed to you.
+ *
+ *   "Shared anonymously" (blue, Shield icon)
+ *     Visible to your firm, your name removed.
+ *     Re-shares through the anonymization pipeline.
+ *
+ * There is no "private" option — all messages contribute to firm knowledge.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
   Brain,
-  Check,
   Cpu,
-  Lock,
+  Shield,
+  Users,
   X,
 } from "lucide-react";
 import { relativeTime } from "../../lib/dates";
@@ -32,13 +47,12 @@ export function ChatPanel() {
     isLoading,
     currentProject,
     currentProjectId,
-    sharedMessageIds,
+    sharingModes,
     sendMessage,
-    shareMessage,
+    setMessageAnonymous,
   } = useChat();
 
   const [input, setInput] = useState("");
-  const [sharingId, setSharingId] = useState(null); // currently being shared
   const textareaRef = useRef(null);
   const bottomRef = useRef(null);
 
@@ -79,17 +93,10 @@ export function ChatPanel() {
     }
   }, [isOpen]);
 
-  // Last assistant message (eligible for sharing)
+  // Last assistant message (eligible for sharing bar)
   const lastAssistantMsg = [...messages]
     .reverse()
     .find((m) => m.role === "assistant");
-
-  const handleShare = async (msgId) => {
-    if (sharingId) return;
-    setSharingId(msgId);
-    await shareMessage(msgId);
-    setSharingId(null);
-  };
 
   return (
     <aside className={`${styles.panel} ${isOpen ? styles.open : ""}`}>
@@ -138,13 +145,12 @@ export function ChatPanel() {
           <div ref={bottomRef} />
         </div>
 
-        {/* ---- Memory share bar (last assistant message only) ---- */}
+        {/* ---- Sharing bar (last assistant message only, not optimistic) ---- */}
         {lastAssistantMsg && !lastAssistantMsg.id?.startsWith("optimistic") && (
-          <MemoryShareBar
+          <SharingBar
             messageId={lastAssistantMsg.id}
-            isShared={sharedMessageIds.has(lastAssistantMsg.id)}
-            isSharing={sharingId === lastAssistantMsg.id}
-            onShare={handleShare}
+            mode={sharingModes[lastAssistantMsg.id] ?? "attributed"}
+            onSetAnonymous={setMessageAnonymous}
           />
         )}
 
@@ -218,33 +224,50 @@ function TypingIndicator() {
 }
 
 // ---------------------------------------------------------------------------
-// MemoryShareBar
+// SharingBar
 // ---------------------------------------------------------------------------
 
-function MemoryShareBar({ messageId, isShared, isSharing, onShare }) {
+/**
+ * SharingBar — toggles between "Shared" (attributed, green) and
+ * "Shared anonymously" (anonymous, blue).
+ *
+ * mode = "attributed" | "anonymous"
+ */
+function SharingBar({ messageId, mode, onSetAnonymous }) {
+  const isAnonymous = mode === "anonymous";
+
   return (
-    <div className={styles.memoryBar}>
-      <div className={styles.memoryToggleRow}>
-        <span className={`${styles.memoryLabel} ${!isShared ? styles.memoryLabelActive : ""}`}>
-          <Lock size={10} />
-          Private
+    <div className={styles.sharingBar}>
+      <div className={styles.sharingRow}>
+        {/* Left label — Shared (attributed) */}
+        <span className={`${styles.sharingLabel} ${!isAnonymous ? styles.sharingLabelGreen : ""}`}>
+          <Users size={10} />
+          Shared
         </span>
 
+        {/* Toggle knob */}
         <button
-          className={`${styles.memoryKnob} ${isShared ? styles.memoryKnobOn : ""}`}
-          onClick={() => !isShared && onShare(messageId)}
-          disabled={isShared || isSharing}
-          aria-label={isShared ? "Shared to firm knowledge" : "Share anonymized to firm knowledge"}
-        >
-          {isShared && <Check size={8} strokeWidth={3} />}
-        </button>
+          className={`${styles.sharingKnob} ${isAnonymous ? styles.sharingKnobAnon : styles.sharingKnobAttr}`}
+          onClick={() => !isAnonymous && onSetAnonymous(messageId)}
+          disabled={isAnonymous}
+          aria-label={
+            isAnonymous
+              ? "Sharing anonymously"
+              : "Switch to share anonymously"
+          }
+        />
 
-        <span className={`${styles.memoryLabel} ${isShared ? styles.memoryLabelActive : ""}`}>
-          Share anonymized
+        {/* Right label — Shared anonymously */}
+        <span className={`${styles.sharingLabel} ${isAnonymous ? styles.sharingLabelBlue : ""}`}>
+          <Shield size={10} />
+          Shared anonymously
         </span>
       </div>
-      <p className={styles.memoryHint}>
-        Sharing removes your name and project details
+
+      <p className={styles.sharingHint}>
+        {isAnonymous
+          ? "Visible to your firm, your name removed"
+          : "Visible to your firm, attributed to you"}
       </p>
     </div>
   );

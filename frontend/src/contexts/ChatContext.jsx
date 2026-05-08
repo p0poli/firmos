@@ -9,15 +9,23 @@
  * isLoading           bool   — waiting for AI response
  * currentProjectId    string — auto-detected from the /project/:id route
  * currentProject      object — project details (name, status) fetched on nav
- * sharedMessageIds    Set    — IDs of messages already shared to firm memory
- * sendMessage(content)       — optimistic add + API call
- * shareMessage(msgId)        — anonymize + persist MemoryChunk
+ * sharingModes        object — { [msgId]: "attributed" | "anonymous" }
+ * sendMessage(content)       — optimistic add + API call + auto-share
+ * setMessageAnonymous(msgId) — toggle a message to "anonymous" mode
+ *
+ * Sharing model
+ * -------------
+ * Every assistant message is automatically shared to firm memory when it
+ * arrives (fire-and-forget call to POST /conversations/:id/share).
+ * The default mode is "attributed" (green indicator). The user can toggle
+ * any message to "anonymous" (blue indicator) which re-calls the share
+ * endpoint so the anonymization pipeline strips personal identifiers.
  *
  * Project-scoping
  * ---------------
  * ChatProvider must live INSIDE <HashRouter> so useMatch() resolves against
- * the current hash path.  When the user is on /project/:id, all messages are
- * scoped to that project.  Navigating away resets scope to firm-wide (null).
+ * the current hash path. When the user is on /project/:id, all messages are
+ * scoped to that project. Navigating away resets scope to firm-wide (null).
  */
 import React, {
   createContext,
@@ -42,7 +50,11 @@ export function ChatProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [sharedMessageIds, setSharedMessageIds] = useState(new Set());
+
+  // { [msgId]: "attributed" | "anonymous" }
+  // Every incoming assistant message starts as "attributed" (auto-shared).
+  // The user can toggle to "anonymous" via setMessageAnonymous().
+  const [sharingModes, setSharingModes] = useState({});
 
   // ---- project scope (auto-derived from route) ----------------------------
   const match = useMatch("/project/:id");
@@ -50,7 +62,7 @@ export function ChatProvider({ children }) {
   const [currentProject, setCurrentProject] = useState(null);
 
   // Track whether we've loaded history for the current scope
-  const loadedScopeRef = useRef(null); // "<projectId|null>:<isOpen>"
+  const loadedScopeRef = useRef(null); // "<projectId|null>"
 
   // ---- fetch project name when scope changes ------------------------------
   useEffect(() => {
@@ -95,7 +107,7 @@ export function ChatProvider({ children }) {
     // so the next open re-fetches.
     loadedScopeRef.current = null;
     setMessages([]);
-    setSharedMessageIds(new Set());
+    setSharingModes({});
   }, [currentProjectId]);
 
   // ---- actions ------------------------------------------------------------
@@ -127,15 +139,22 @@ export function ChatProvider({ children }) {
           currentProjectId
         );
 
+        const msgId = assistantMsg.message_id;
+
         setMessages((prev) => [
           ...prev,
           {
-            id: assistantMsg.message_id,
+            id: msgId,
             role: "assistant",
             content: assistantMsg.content,
             created_at: assistantMsg.created_at,
           },
         ]);
+
+        // 3. Auto-share to firm memory — always, fire-and-forget.
+        //    Default mode is "attributed"; user can later toggle to "anonymous".
+        setSharingModes((prev) => ({ ...prev, [msgId]: "attributed" }));
+        shareConversationMessage(msgId).catch(() => {});
       } catch {
         // Remove the optimistic message on failure so the user knows
         // something went wrong.
@@ -147,19 +166,16 @@ export function ChatProvider({ children }) {
     [isLoading, currentProjectId]
   );
 
-  const shareMessage = useCallback(
-    async (messageId) => {
-      if (sharedMessageIds.has(messageId)) return null;
-      try {
-        const result = await shareConversationMessage(messageId);
-        setSharedMessageIds((prev) => new Set([...prev, messageId]));
-        return result;
-      } catch {
-        return null;
-      }
-    },
-    [sharedMessageIds]
-  );
+  /**
+   * Toggle a message to "anonymous" mode.
+   * Re-calls the share endpoint so the anonymization pipeline strips
+   * personal identifiers from the firm memory contribution.
+   */
+  const setMessageAnonymous = useCallback((messageId) => {
+    setSharingModes((prev) => ({ ...prev, [messageId]: "anonymous" }));
+    // Re-share through the anonymization pipeline (fire-and-forget).
+    shareConversationMessage(messageId).catch(() => {});
+  }, []);
 
   // ---- context value ------------------------------------------------------
 
@@ -170,9 +186,9 @@ export function ChatProvider({ children }) {
     isLoading,
     currentProjectId,
     currentProject,
-    sharedMessageIds,
+    sharingModes,
     sendMessage,
-    shareMessage,
+    setMessageAnonymous,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
