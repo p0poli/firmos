@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session as OrmSession
 
 from database import get_db
@@ -9,7 +9,7 @@ from schemas.revit import (
     ModelEventCreate,
     ModelEventOut,
 )
-from services import auth_service, knowledge_graph_service
+from services import auth_service, knowledge_graph_service, memory_pipeline
 
 router = APIRouter(prefix="/revit", tags=["revit"])
 
@@ -45,6 +45,7 @@ def receive_event(
 @router.post("/check", response_model=CheckResultOut, status_code=status.HTTP_201_CREATED)
 def receive_check(
     payload: CheckResultCreate,
+    background_tasks: BackgroundTasks,
     db: OrmSession = Depends(get_db),
     user: User = Depends(auth_service.get_current_user),
 ) -> CheckResult:
@@ -69,6 +70,17 @@ def receive_check(
     knowledge_graph_service.on_check_result_saved(db, check, event.project_id)
     db.commit()
     db.refresh(check)
+
+    # Background: embed check result summary into the submitter's personal memory.
+    background_tasks.add_task(
+        memory_pipeline.embed_check_result,
+        check_id=check.id,
+        user_id=user.id,
+        check_type=check.check_type.value if check.check_type else "",
+        status=check.status.value if check.status else "",
+        issues=check.issues,
+    )
+
     return check
 
 

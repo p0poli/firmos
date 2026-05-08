@@ -228,4 +228,50 @@ export const generateInsight = (projectId, type) =>
     .post(`/insights/generate/${projectId}`, null, { params: { type } })
     .then((r) => r.data);
 
+// --- conversations / memory -----------------------------------------------
+
+/**
+ * Send a user message and receive the assistant response.
+ * Returns { message_id, content, created_at }.
+ */
+export const sendChatMessage = (content, projectId = null) =>
+  api
+    .post("/conversations/message", {
+      content,
+      project_id: projectId || null,
+    })
+    .then((r) => r.data);
+
+/**
+ * Fetch conversation history for the current user.
+ * Returns HistoryMessageOut[] ordered by created_at asc.
+ */
+export const getChatHistory = (projectId = null, limit = 100) =>
+  api
+    .get("/conversations/history", {
+      params: { project_id: projectId || undefined, limit },
+    })
+    .then((r) => r.data);
+
+/**
+ * Anonymize a message and contribute it to the firm knowledge pool.
+ * Returns { memory_chunk_id, anonymized_preview }.
+ */
+export const shareConversationMessage = (messageId) =>
+  api.post(`/conversations/${messageId}/share`).then((r) => r.data);
+
+/**
+ * Soft-delete a firm memory contribution (sets is_active=false).
+ * Returns { success: true }.
+ */
+export const withdrawContribution = (chunkId) =>
+  api.delete(`/conversations/memory/${chunkId}/withdraw`).then((r) => r.data);
+
+/**
+ * List all MemoryChunks contributed by the current user.
+ * Returns ContributionOut[].
+ */
+export const getMyContributions = () =>
+  api.get("/conversations/my-contributions").then((r) => r.data);
+
 export default api;

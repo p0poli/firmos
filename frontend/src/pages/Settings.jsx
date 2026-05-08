@@ -14,11 +14,14 @@ import { useNavigate } from "react-router-dom";
 import {
   BotMessageSquare,
   Boxes,
+  Brain,
   FlameKindling,
   Lock,
   LogOut,
   PenLine,
   Puzzle,
+  Tag,
+  Undo2,
 } from "lucide-react";
 import {
   Avatar,
@@ -34,12 +37,14 @@ import {
 import {
   createUser,
   getFirmSettings,
+  getMyContributions,
   listUsers,
   logout,
   updateAiKey,
   updateAiProvider,
   updateModule,
   updateUserRole,
+  withdrawContribution,
 } from "../api";
 import { useUser } from "../contexts/UserContext";
 import styles from "./Settings.module.css";
@@ -48,6 +53,7 @@ import styles from "./Settings.module.css";
 
 const TABS = [
   { key: "account",  label: "My Account" },
+  { key: "memory",   label: "My Memory" },
   { key: "ai",       label: "AI Settings" },
   { key: "modules",  label: "Modules" },
   { key: "team",     label: "Team" },
@@ -103,6 +109,10 @@ export default function Settings() {
 
       <TabPanel active={tab === "account"}>
         <AccountTab user={user} role={role} loading={loading} onLogout={handleLogout} />
+      </TabPanel>
+
+      <TabPanel active={tab === "memory"}>
+        <MemoryTab />
       </TabPanel>
 
       <TabPanel active={tab === "ai"}>
@@ -664,6 +674,139 @@ function TeamTab({ currentUserId }) {
             )}
           </div>
         </form>
+      </Card>
+    </div>
+  );
+}
+
+// --- My Memory tab ---------------------------------------------------------
+
+function MemoryTab() {
+  const [contributions, setContributions] = useState(null); // null = loading
+  const [error,         setError]         = useState(null);
+  const [withdrawing,   setWithdrawing]   = useState({});   // { [id]: bool }
+  const [withdrawErrs,  setWithdrawErrs]  = useState({});   // { [id]: string }
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const data = await getMyContributions();
+      setContributions(data);
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? "Could not load contributions.");
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleWithdraw = async (chunkId) => {
+    setWithdrawing((w) => ({ ...w, [chunkId]: true }));
+    setWithdrawErrs((e) => ({ ...e, [chunkId]: null }));
+    try {
+      await withdrawContribution(chunkId);
+      // Optimistically mark as withdrawn
+      setContributions((prev) =>
+        prev.map((c) => (c.id === chunkId ? { ...c, is_active: false } : c))
+      );
+    } catch (err) {
+      setWithdrawErrs((e) => ({
+        ...e,
+        [chunkId]: err?.response?.data?.detail ?? "Withdraw failed.",
+      }));
+    } finally {
+      setWithdrawing((w) => ({ ...w, [chunkId]: false }));
+    }
+  };
+
+  const activeCount   = (contributions ?? []).filter((c) => c.is_active).length;
+  const totalCount    = (contributions ?? []).length;
+
+  return (
+    <div className={styles.tabPanel}>
+      {/* Explainer */}
+      <Card padding="lg">
+        <CardHeader
+          title="Firm memory contributions"
+          subtitle="Messages you've shared anonymously to the firm knowledge pool. You can withdraw any contribution at any time."
+        />
+        <div className={styles.memoryMeta}>
+          <Brain size={16} className={styles.memoryMetaIcon} />
+          <span>
+            {contributions === null
+              ? "Loading…"
+              : `${activeCount} active · ${totalCount - activeCount} withdrawn`}
+          </span>
+        </div>
+      </Card>
+
+      {/* List */}
+      <Card padding="lg">
+        {error && (
+          <p style={{ color: "var(--color-danger)", fontSize: "var(--text-sm)" }}>{error}</p>
+        )}
+
+        {contributions === null && !error && <SkeletonGroup count={3} />}
+
+        {contributions !== null && contributions.length === 0 && (
+          <div className={styles.memoryEmpty}>
+            <Brain size={28} strokeWidth={1.5} style={{ opacity: 0.35 }} />
+            <p>You haven't shared any messages yet.</p>
+            <p style={{ fontSize: "var(--text-xs)" }}>
+              Use the toggle at the bottom of the chat panel to contribute an AI response to your firm's knowledge pool.
+            </p>
+          </div>
+        )}
+
+        {contributions !== null && contributions.length > 0 && (
+          <ul className={styles.contribList}>
+            {contributions.map((c) => {
+              const isBusy = withdrawing[c.id];
+              const wErr   = withdrawErrs[c.id];
+
+              return (
+                <li key={c.id} className={styles.contribRow}>
+                  <div className={styles.contribBody}>
+                    <p className={styles.contribPreview}>{c.anonymized_preview}</p>
+                    <div className={styles.contribMeta}>
+                      <span className={styles.contribCategory}>
+                        {c.category}
+                      </span>
+                      {c.tags.map((t) => (
+                        <span key={t} className={styles.contribTag}>
+                          <Tag size={9} />
+                          {t}
+                        </span>
+                      ))}
+                      <span className={styles.contribDate}>
+                        {new Date(c.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {wErr && (
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)" }}>
+                        {wErr}
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.contribActions}>
+                    {c.is_active ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        leadingIcon={<Undo2 size={13} />}
+                        onClick={() => handleWithdraw(c.id)}
+                        disabled={isBusy}
+                      >
+                        {isBusy ? "…" : "Withdraw"}
+                      </Button>
+                    ) : (
+                      <span className={styles.contribWithdrawn}>Withdrawn</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Card>
     </div>
   );

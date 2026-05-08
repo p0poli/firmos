@@ -1,12 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session as OrmSession
 
 from database import get_db
 from models import Project, Task, User
 from schemas.task import TaskCreate, TaskOut, TaskUpdate
-from services import auth_service, knowledge_graph_service
+from services import auth_service, knowledge_graph_service, memory_pipeline
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -26,6 +26,7 @@ def _load_task(db: OrmSession, task_id: UUID, firm_id: UUID) -> Task:
 @router.post("/", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
 def create_task(
     payload: TaskCreate,
+    background_tasks: BackgroundTasks,
     db: OrmSession = Depends(get_db),
     user: User = Depends(auth_service.get_current_user),
 ) -> Task:
@@ -42,6 +43,17 @@ def create_task(
     knowledge_graph_service.on_task_created(db, task)
     db.commit()
     db.refresh(task)
+
+    # Background: embed task into the creator's personal memory so task
+    # context surfaces in future Vitruvius conversations.
+    background_tasks.add_task(
+        memory_pipeline.embed_task,
+        task_id=task.id,
+        user_id=user.id,
+        title=task.title,
+        description=getattr(task, "description", None),
+    )
+
     return task
 
 

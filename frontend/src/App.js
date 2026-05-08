@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import PrivateRoute from "./components/PrivateRoute";
+import { ChatProvider } from "./contexts/ChatContext";
 import { PageTitleProvider } from "./contexts/PageTitleContext";
 import { UserProvider } from "./contexts/UserContext";
 import Dashboard from "./pages/Dashboard";
@@ -19,30 +20,34 @@ export default function App() {
     <UserProvider>
     <PageTitleProvider>
       <HashRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          {/* Public, unauth — visual sanity check for design-system
-              primitives. Mounted at /#/_styleguide; kept around as a
-              live reference for the design system. */}
-          <Route path="/_styleguide" element={<Styleguide />} />
-          <Route
-            element={
-              <PrivateRoute>
-                <Layout />
-              </PrivateRoute>
-            }
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="portfolio" element={<Portfolio />} />
-            <Route path="project/:id" element={<ProjectDetail />} />
-            <Route path="tasks" element={<Tasks />} />
-            <Route path="gantt" element={<Gantt />} />
-            <Route path="files" element={<Files />} />
-            <Route path="knowledge" element={<KnowledgeGraph />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        {/* ChatProvider must live inside HashRouter so useMatch() resolves
+            against the current hash path for project-scoped chat. */}
+        <ChatProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            {/* Public, unauth — visual sanity check for design-system
+                primitives. Mounted at /#/_styleguide; kept around as a
+                live reference for the design system. */}
+            <Route path="/_styleguide" element={<Styleguide />} />
+            <Route
+              element={
+                <PrivateRoute>
+                  <Layout />
+                </PrivateRoute>
+              }
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="portfolio" element={<Portfolio />} />
+              <Route path="project/:id" element={<ProjectDetail />} />
+              <Route path="tasks" element={<Tasks />} />
+              <Route path="gantt" element={<Gantt />} />
+              <Route path="files" element={<Files />} />
+              <Route path="knowledge" element={<KnowledgeGraph />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ChatProvider>
       </HashRouter>
     </PageTitleProvider>
     </UserProvider>

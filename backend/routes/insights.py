@@ -1,14 +1,14 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session as OrmSession
 
 from database import get_db
 from models import Firm, Insight, Project, User
 from schemas.insight import InsightOut
-from services import ai_service, auth_service
+from services import ai_service, auth_service, memory_pipeline
 
 router = APIRouter(prefix="/insights", tags=["insights"])
 
@@ -100,6 +100,7 @@ def firm_insights(
 @router.post("/generate/{project_id}", response_model=list[InsightOut])
 async def generate(
     project_id: UUID,
+    background_tasks: BackgroundTasks,
     type: Optional[str] = Query(
         default=None,
         description=(
@@ -135,6 +136,17 @@ async def generate(
         insights = [await ai_service.generate_insight(db, firm, user, project, type)]
 
     db.commit()
+
+    # Background: embed each generated insight into the requesting user's
+    # personal memory so it surfaces in future conversations.
+    for ins in insights:
+        background_tasks.add_task(
+            memory_pipeline.embed_insight,
+            insight_id=ins.id,
+            user_id=user.id,
+            content=ins.content,
+        )
+
     return insights
 
 
