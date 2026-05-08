@@ -31,6 +31,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { shareConversationMessage } from "../../api";
 import { relativeTime } from "../../lib/dates";
 import { useChat } from "../../contexts/ChatContext";
 import styles from "./ChatPanel.module.css";
@@ -47,9 +48,7 @@ export function ChatPanel() {
     isLoading,
     currentProject,
     currentProjectId,
-    sharingModes,
     sendMessage,
-    setMessageAnonymous,
   } = useChat();
 
   const [input, setInput] = useState("");
@@ -148,9 +147,8 @@ export function ChatPanel() {
         {/* ---- Sharing bar (last assistant message only, not optimistic) ---- */}
         {lastAssistantMsg && !lastAssistantMsg.id?.startsWith("optimistic") && (
           <SharingBar
+            key={lastAssistantMsg.id}
             messageId={lastAssistantMsg.id}
-            mode={sharingModes[lastAssistantMsg.id] ?? "attributed"}
-            onSetAnonymous={setMessageAnonymous}
           />
         )}
 
@@ -228,13 +226,21 @@ function TypingIndicator() {
 // ---------------------------------------------------------------------------
 
 /**
- * SharingBar — toggles between "Shared" (attributed, green) and
- * "Shared anonymously" (anonymous, blue).
+ * SharingBar — two-way toggle between "Shared" and "Shared anonymously".
  *
- * mode = "attributed" | "anonymous"
+ * Owns its own isAnonymous boolean (default false = attributed).
+ * Re-mounted via key={messageId} on each new assistant message so state
+ * always resets to false for fresh messages.
+ * Calls shareConversationMessage on every toggle (both directions).
  */
-function SharingBar({ messageId, mode, onSetAnonymous }) {
-  const isAnonymous = mode === "anonymous";
+function SharingBar({ messageId }) {
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  const handleToggle = useCallback(() => {
+    setIsAnonymous((prev) => !prev);
+    // Fire-and-forget re-share each time the mode changes.
+    shareConversationMessage(messageId).catch(() => {});
+  }, [messageId]);
 
   return (
     <div className={styles.sharingBar}>
@@ -245,14 +251,13 @@ function SharingBar({ messageId, mode, onSetAnonymous }) {
           Shared
         </span>
 
-        {/* Toggle knob */}
+        {/* Two-way toggle knob */}
         <button
           className={`${styles.sharingKnob} ${isAnonymous ? styles.sharingKnobAnon : styles.sharingKnobAttr}`}
-          onClick={() => !isAnonymous && onSetAnonymous(messageId)}
-          disabled={isAnonymous}
+          onClick={handleToggle}
           aria-label={
             isAnonymous
-              ? "Sharing anonymously"
+              ? "Switch to shared with attribution"
               : "Switch to share anonymously"
           }
         />
