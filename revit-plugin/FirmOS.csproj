@@ -2,19 +2,19 @@
 
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
-    <AssemblyName>FirmOS</AssemblyName>
-    <RootNamespace>FirmOS</RootNamespace>
-    <UseWPF>false</UseWPF>
+    <AssemblyName>FirmOS.Revit</AssemblyName>
+    <RootNamespace>FirmOS.Revit</RootNamespace>
+    <UseWPF>true</UseWPF>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <Configurations>Debug;Release</Configurations>
     <Platforms>x64</Platforms>
     <!--
       Set RevitInstallDir on the command line or via an MSBuild .props file, e.g.:
-        msbuild /p:RevitInstallDir="C:\Program Files\Autodesk\Revit 2024\"
-      Defaults to Revit 2024 install path.
+        msbuild /p:RevitInstallDir="C:\Program Files\Autodesk\Revit 2026\"
+      Defaults to Revit 2026 install path.
     -->
-    <RevitInstallDir Condition=" '$(RevitInstallDir)' == '' ">C:\Program Files\Autodesk\Revit 2024\</RevitInstallDir>
+    <RevitInstallDir Condition=" '$(RevitInstallDir)' == '' ">C:\Program Files\Autodesk\Revit 2026\</RevitInstallDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -41,5 +41,19 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <!-- Copy build output to Revit 2026 add-ins folder after every build -->
+  <Target Name="CopyToRevitAddins" AfterTargets="Build">
+    <PropertyGroup>
+      <RevitAddinsDir>$(APPDATA)\Autodesk\Revit\Addins\2026\</RevitAddinsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(RevitAddinsDir)" Condition="!Exists('$(RevitAddinsDir)')" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll"
+          DestinationFolder="$(RevitAddinsDir)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(ProjectDir)FirmOS.addin"
+          DestinationFolder="$(RevitAddinsDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>
