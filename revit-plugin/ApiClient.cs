@@ -13,6 +13,7 @@ namespace FirmOS.Revit
     /// <summary>
     /// Singleton HTTP client that talks to the Vitruvius backend.
     /// Token and base-URL are persisted in %APPDATA%\Vitruvius\config.json.
+    /// All calls are logged to %APPDATA%\Vitruvius\startup_log.txt.
     /// </summary>
     public sealed class ApiClient
     {
@@ -27,11 +28,16 @@ namespace FirmOS.Revit
 
         private readonly HttpClient _http;
         private readonly string     _configPath;
-        private readonly JsonSerializerSettings _json = new JsonSerializerSettings
+
+        // Used for *serialising* outgoing request bodies (camelCase keys).
+        private readonly JsonSerializerSettings _serializeSettings = new JsonSerializerSettings
         {
-            ContractResolver      = new CamelCasePropertyNamesContractResolver(),
-            NullValueHandling     = NullValueHandling.Ignore,
+            ContractResolver  = new CamelCasePropertyNamesContractResolver(),
+            NullValueHandling = NullValueHandling.Ignore,
         };
+
+        // Newtonsoft.Json deserialises case-insensitively by default, so no
+        // special settings are needed for incoming responses.
 
         private VitruviusConfig _config;
 
@@ -55,6 +61,8 @@ namespace FirmOS.Revit
                 new MediaTypeWithQualityHeaderValue("application/json"));
 
             ApplyToken();
+
+            Log($"ApiClient initialised — base URL: {_http.BaseAddress}");
         }
 
         // ---- Public API -------------------------------------------------------
@@ -63,56 +71,102 @@ namespace FirmOS.Revit
             !string.IsNullOrWhiteSpace(_config?.AccessToken);
 
         /// <summary>
-        /// Authenticates with the backend and persists the JWT to disk.
-        /// Throws <see cref="HttpRequestException"/> on network error or 4xx/5xx.
+        /// POST /auth/login  {"email": "…", "password": "…"}
+        /// On success, persists the JWT to config.json and sets the
+        /// Authorization header for all subsequent requests.
+        /// Throws <see cref="HttpRequestException"/> with the server's error
+        /// body included in the message on any non-2xx response.
         /// </summary>
         public async Task LoginAsync(string email, string password)
         {
-            var body = Serialize(new LoginRequest { Email = email, Password = password });
-            // OAuth2 password-grant endpoint
-            var form = new FormUrlEncodedContent(new[]
+            // Build JSON body — Content-Type: application/json
+            var requestBody = new LoginRequest { Email = email, Password = password };
+            var json        = JsonConvert.SerializeObject(requestBody, _serializeSettings);
+            var content     = new StringContent(json, Encoding.UTF8, "application/json");
+
+            // Resolve and log the full URL so we can confirm it is correct.
+            var fullUrl = new Uri(_http.BaseAddress!, "auth/login").ToString();
+            Log($"LoginAsync ▶ POST {fullUrl}");
+            Log($"  Request body: {json}");
+
+            HttpResponseMessage resp;
+            try
             {
-                new System.Collections.Generic.KeyValuePair<string,string>("username", email),
-                new System.Collections.Generic.KeyValuePair<string,string>("password", password),
-            });
+                resp = await _http.PostAsync("auth/login", content).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Log($"LoginAsync ✗ network error: {ex.Message}");
+                throw;
+            }
 
-            var resp = await _http.PostAsync("auth/token", form).ConfigureAwait(false);
-            await EnsureSuccess(resp).ConfigureAwait(false);
+            var responseBody = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            Log($"  Response {(int)resp.StatusCode}: {responseBody}");
 
-            var result = await Deserialize<LoginResponse>(resp).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode)
+                throw new HttpRequestException(
+                    $"HTTP {(int)resp.StatusCode} from {fullUrl}: {responseBody}");
+
+            var result = JsonConvert.DeserializeObject<LoginResponse>(responseBody);
+            if (result?.AccessToken == null)
+                throw new InvalidOperationException(
+                    $"Login succeeded but response contained no access_token. Body: {responseBody}");
+
             _config.AccessToken = result.AccessToken;
             _config.Email       = email;
             SaveConfig();
             ApplyToken();
+
+            Log("LoginAsync ◀ succeeded — token stored.");
         }
 
         /// <summary>Returns all projects visible to the authenticated user.</summary>
         public async Task<List<ProjectResponse>> GetProjectsAsync()
         {
-            var resp = await _http.GetAsync("projects/").ConfigureAwait(false);
-            await EnsureSuccess(resp).ConfigureAwait(false);
-            return await Deserialize<List<ProjectResponse>>(resp).ConfigureAwait(false);
+            var fullUrl = new Uri(_http.BaseAddress!, "projects/").ToString();
+            Log($"GetProjectsAsync ▶ GET {fullUrl}");
+
+            HttpResponseMessage resp;
+            try
+            {
+                resp = await _http.GetAsync("projects/").ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Log($"GetProjectsAsync ✗ network error: {ex.Message}");
+                throw;
+            }
+
+            var responseBody = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            Log($"  Response {(int)resp.StatusCode}: {Truncate(responseBody, 300)}");
+
+            if (!resp.IsSuccessStatusCode)
+                throw new HttpRequestException(
+                    $"HTTP {(int)resp.StatusCode} from {fullUrl}: {responseBody}");
+
+            return JsonConvert.DeserializeObject<List<ProjectResponse>>(responseBody)
+                   ?? new List<ProjectResponse>();
         }
 
         /// <summary>
-        /// Posts a model-lifecycle event (opened / closed / synced) to the backend.
-        /// Returns silently on failure so callers never crash Revit.
+        /// POST /revit/event  — fire-and-forget model lifecycle event.
+        /// Never throws; logs failures so Revit is never crashed.
         /// </summary>
         public async Task SendModelEventAsync(ModelEventPayload payload)
         {
             try
             {
-                var content = new StringContent(
-                    JsonConvert.SerializeObject(payload, _json),
-                    Encoding.UTF8, "application/json");
+                var json    = JsonConvert.SerializeObject(payload, _serializeSettings);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+                Log($"SendModelEventAsync ▶ POST revit/event ({payload.EventType})");
                 var resp = await _http.PostAsync("revit/event", content).ConfigureAwait(false);
-                await EnsureSuccess(resp).ConfigureAwait(false);
+                var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                Log($"  Response {(int)resp.StatusCode}: {Truncate(body, 200)}");
             }
             catch (Exception ex)
             {
-                // Non-fatal — log to Revit journal and continue.
-                System.Diagnostics.Trace.WriteLine($"[Vitruvius] SendModelEvent failed: {ex.Message}");
+                Log($"SendModelEventAsync ✗ {ex.Message}");
             }
         }
 
@@ -131,11 +185,16 @@ namespace FirmOS.Revit
             try
             {
                 if (File.Exists(_configPath))
-                    return JsonConvert.DeserializeObject<VitruviusConfig>(
-                               File.ReadAllText(_configPath))
-                           ?? new VitruviusConfig();
+                {
+                    var cfg = JsonConvert.DeserializeObject<VitruviusConfig>(
+                                  File.ReadAllText(_configPath));
+                    if (cfg != null) return cfg;
+                }
             }
-            catch { /* corrupt file — start fresh */ }
+            catch (Exception ex)
+            {
+                Log($"LoadConfig warning (corrupt file reset): {ex.Message}");
+            }
             return new VitruviusConfig();
         }
 
@@ -144,31 +203,23 @@ namespace FirmOS.Revit
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(_configPath)!);
-                File.WriteAllText(_configPath, JsonConvert.SerializeObject(_config, Formatting.Indented));
+                File.WriteAllText(
+                    _configPath,
+                    JsonConvert.SerializeObject(_config, Formatting.Indented));
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Trace.WriteLine($"[Vitruvius] SaveConfig failed: {ex.Message}");
+                Log($"SaveConfig failed: {ex.Message}");
             }
         }
 
-        private string Serialize(object obj) =>
-            JsonConvert.SerializeObject(obj, _json);
+        // ---- Logging ----------------------------------------------------------
+        // Reuses FirmOSApp.Log so everything goes to the same file.
 
-        private static async Task<T> Deserialize<T>(HttpResponseMessage resp)
-        {
-            var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            return JsonConvert.DeserializeObject<T>(json);
-        }
+        private static void Log(string message) =>
+            FirmOSApp.Log($"[ApiClient] {message}");
 
-        private static async Task EnsureSuccess(HttpResponseMessage resp)
-        {
-            if (!resp.IsSuccessStatusCode)
-            {
-                var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-                throw new HttpRequestException(
-                    $"HTTP {(int)resp.StatusCode}: {body}");
-            }
-        }
+        private static string Truncate(string s, int maxLen) =>
+            s.Length <= maxLen ? s : s[..maxLen] + "…";
     }
 }
