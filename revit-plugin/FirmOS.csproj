@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <!-- Revit 2025+ requires .NET 8 -->
+    <TargetFramework>net8.0-windows</TargetFramework>
     <AssemblyName>FirmOS.Revit</AssemblyName>
     <RootNamespace>FirmOS.Revit</RootNamespace>
     <UseWPF>true</UseWPF>

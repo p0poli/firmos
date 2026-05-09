@@ -1,0 +1,119 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      Revit 2025+ requires .NET 8.  Targeting net48 against the modern dotnet
+      SDK causes MC1000 XAML-compiler failures (System.Security.SecurityRuleSet
+      not found in the facades layer).  net8.0-windows resolves both issues.
+    -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <AssemblyName>FirmOS.Revit</AssemblyName>
+    <RootNamespace>FirmOS.Revit</RootNamespace>
+    <UseWPF>true</UseWPF>
+
+    <!--
+      CopyLocalLockFileAssemblies=true  → NuGet-provided DLLs (e.g. Newtonsoft.Json)
+                                          are copied to bin\Debug\ alongside FirmOS.Revit.dll.
+    -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
+    <!-- Keep output at bin\Debug\ (not bin\Debug\net8.0-windows\) -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <!--
+      Suppress auto-generated AssemblyInfo so it doesn't clash with
+      the existing Properties\AssemblyInfo.cs.
+    -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <Platforms>x64</Platforms>
+    <RevitInstallDir Condition=" '$(RevitInstallDir)' == '' ">C:\Program Files\Autodesk\Revit 2026\</RevitInstallDir>
+  </PropertyGroup>
+
+  <!-- ── Source files (live two levels up at revit-plugin\) ────────────── -->
+  <ItemGroup>
+    <Compile Include="..\..\Models.cs" />
+    <Compile Include="..\..\ApiClient.cs" />
+    <Compile Include="..\..\ProjectMatcher.cs" />
+    <Compile Include="..\..\FirmOSApp.cs" />
+    <Compile Include="..\..\ConnectCommand.cs" />
+    <!-- XAML code-behind files — must be listed before their <Page> counterpart -->
+    <Compile Include="..\..\LoginDialog.xaml.cs" />
+    <Compile Include="..\..\ProjectSelectDialog.xaml.cs" />
+  </ItemGroup>
+
+  <!-- ── WPF XAML pages ────────────────────────────────────────────────── -->
+  <ItemGroup>
+    <Page Include="..\..\LoginDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="..\..\ProjectSelectDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <!-- ── NuGet packages ────────────────────────────────────────────────── -->
+  <ItemGroup>
+    <!--
+      Private defaults to true for PackageReference in SDK-style projects,
+      so Newtonsoft.Json.dll is copied to bin\Debug\ automatically when
+      CopyLocalLockFileAssemblies=true is set above.
+    -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!-- ── Framework / Revit API references ─────────────────────────────── -->
+  <ItemGroup>
+    <Reference Include="RevitAPI">
+      <HintPath>$(RevitInstallDir)RevitAPI.dll</HintPath>
+      <!-- Private=false → do NOT copy Revit's own DLLs to output; Revit loads them. -->
+      <Private>false</Private>
+      <SpecificVersion>false</SpecificVersion>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>$(RevitInstallDir)RevitAPIUI.dll</HintPath>
+      <Private>false</Private>
+      <SpecificVersion>false</SpecificVersion>
+    </Reference>
+    <!--
+      System.Net.Http is built into .NET 8 — no explicit reference needed.
+      System.ComponentModel.Composition is unused in our code base.
+    -->
+  </ItemGroup>
+
+  <!-- ── Copy .addin manifest to output so post-build picks it up ──────── -->
+  <ItemGroup>
+    <None Include="..\..\FirmOS.addin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!--
+    Post-build: copy EVERYTHING in bin\Debug\ (or bin\Release\) to the
+    Revit 2026 add-ins folder.  Using a wildcard means any future NuGet
+    dependency is included automatically without editing this file.
+  -->
+  <Target Name="CopyToRevitAddins" AfterTargets="Build">
+    <PropertyGroup>
+      <RevitAddinsDir>$(APPDATA)\Autodesk\Revit\Addins\2026\</RevitAddinsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(RevitAddinsDir)" Condition="!Exists('$(RevitAddinsDir)')" />
+    <ItemGroup>
+      <_OutputFiles Include="$(OutputPath)*.*" />
+    </ItemGroup>
+    <!--
+      ContinueOnError="WarnAndContinue": if Revit is running it will lock
+      FirmOS.Revit.dll; treat that as a warning, not a build failure.
+      Close Revit before rebuilding to get a full deploy.
+    -->
+    <Copy SourceFiles="@(_OutputFiles)"
+          DestinationFolder="$(RevitAddinsDir)"
+          SkipUnchangedFiles="true"
+          ContinueOnError="WarnAndContinue" />
+    <Message Text="[Vitruvius] Copied @(_OutputFiles->Count()) file(s) to $(RevitAddinsDir)"
+             Importance="high" />
+  </Target>
+
+</Project>
