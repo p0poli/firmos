@@ -6,30 +6,53 @@ namespace FirmOS.Revit
 {
     /// <summary>
     /// Code-behind for <see cref="LoginDialog"/>.
-    /// Async login is marshalled onto the UI thread via Dispatcher so progress
-    /// feedback (button text, error label) stays responsive.
+    /// All login steps are logged to %APPDATA%\Vitruvius\startup_log.txt.
     /// </summary>
     public partial class LoginDialog : Window
     {
         public LoginDialog()
         {
-            InitializeComponent();
-            Loaded += (_, __) => EmailBox.Focus();
+            Log("LoginDialog constructor ▶ calling InitializeComponent()");
+            try
+            {
+                InitializeComponent();
+                Log("LoginDialog constructor ◀ InitializeComponent() succeeded");
+            }
+            catch (Exception ex)
+            {
+                FirmOSApp.LogException("LoginDialog.InitializeComponent", ex);
+                throw;   // re-throw so ConnectCommand sees and logs it too
+            }
+
+            Loaded += (_, __) =>
+            {
+                Log("LoginDialog Loaded — focusing EmailBox");
+                EmailBox.Focus();
+            };
         }
 
         // ---- Event handlers --------------------------------------------------
 
-        private async void ConnectBtn_Click(object sender, RoutedEventArgs e) =>
+        private async void ConnectBtn_Click(object sender, RoutedEventArgs e)
+        {
+            Log("Connect button clicked");
             await TryLoginAsync();
+        }
 
         private async void Input_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Return)
+            {
+                Log("Enter key pressed in input field");
                 await TryLoginAsync();
+            }
         }
 
-        private void CloseBtn_Click(object sender, RoutedEventArgs e) =>
+        private void CloseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            Log("LoginDialog close button clicked — DialogResult = false");
             DialogResult = false;
+        }
 
         private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -44,8 +67,11 @@ namespace FirmOS.Revit
             var email    = EmailBox.Text.Trim();
             var password = PasswordBox.Password;
 
+            Log($"TryLoginAsync ▶ email='{email}' password={( string.IsNullOrEmpty(password) ? "(empty)" : $"({password.Length} chars)")}");
+
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
+                Log("TryLoginAsync ◀ validation failed (empty email or password)");
                 ShowError("Please enter your email and password.");
                 return;
             }
@@ -55,16 +81,24 @@ namespace FirmOS.Revit
 
             try
             {
+                Log($"Calling ApiClient.Instance.LoginAsync(email='{email}')...");
                 await ApiClient.Instance.LoginAsync(email, password);
-                DialogResult = true;   // closes the dialog; caller checks IsLoggedIn()
+                Log("LoginAsync returned successfully — setting DialogResult = true");
+                DialogResult = true;
             }
             catch (Exception ex)
             {
-                ShowError(GetFriendlyError(ex));
+                // Log full exception BEFORE converting to friendly message.
+                FirmOSApp.LogException("LoginDialog.TryLoginAsync", ex);
+
+                var friendly = GetFriendlyError(ex);
+                Log($"Showing friendly error: '{friendly}'");
+                ShowError(friendly);
             }
             finally
             {
                 SetBusy(false);
+                Log("TryLoginAsync ◀ complete");
             }
         }
 
@@ -89,12 +123,26 @@ namespace FirmOS.Revit
 
         private static string GetFriendlyError(Exception ex)
         {
-            var msg = ex.InnerException?.Message ?? ex.Message;
-            if (msg.Contains("401") || msg.Contains("403"))
+            // Walk the full inner-exception chain for the most specific message.
+            var msg = ex.Message;
+            for (var inner = ex.InnerException; inner != null; inner = inner.InnerException)
+                msg = inner.Message;
+
+            if (msg.Contains("401") || msg.Contains("403") ||
+                msg.Contains("Incorrect") || msg.Contains("invalid"))
                 return "Incorrect email or password.";
-            if (msg.Contains("connect") || msg.Contains("network") || msg.Contains("timeout"))
+
+            if (msg.Contains("404"))
+                return $"Endpoint not found (404). Check the server URL.\n\nDetails: {msg}";
+
+            if (msg.Contains("connect") || msg.Contains("network") ||
+                msg.Contains("timeout") || msg.Contains("refused"))
                 return "Could not reach Vitruvius. Check your internet connection.";
+
             return $"Login failed: {msg}";
         }
+
+        private static void Log(string msg) =>
+            FirmOSApp.Log($"[LoginDialog] {msg}");
     }
 }
