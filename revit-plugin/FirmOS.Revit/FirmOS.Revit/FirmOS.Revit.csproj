@@ -26,7 +26,19 @@
     -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 
-    <Platforms>x64</Platforms>
+    <!--
+      <Platforms>AnyCPU</Platforms> → Visual Studio maps its default "Any CPU"
+      solution configuration to this project, so "Rebuild All" no longer skips it.
+
+      <PlatformTarget>x64</PlatformTarget> → the compiler still emits a 64-bit
+      assembly, which Revit (a 64-bit host) requires.
+
+      These two properties are independent:
+        Platforms     = what solution-level platform label VS uses
+        PlatformTarget = what the C# compiler actually targets
+    -->
+    <Platforms>AnyCPU</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
     <RevitInstallDir Condition=" '$(RevitInstallDir)' == '' ">C:\Program Files\Autodesk\Revit 2026\</RevitInstallDir>
   </PropertyGroup>
 
