@@ -55,6 +55,22 @@ namespace FirmOS.Revit
         {
             try
             {
+                // If no project was set via SetProject (i.e. the panel loaded while a
+                // document was already open), try to resolve it from the current file.
+                if (_currentProjectId == Guid.Empty)
+                {
+                    var filePath = FirmOSApp.CurrentOpenFilePath;
+                    if (!string.IsNullOrEmpty(filePath))
+                    {
+                        var pid = ProjectMatcher.Instance.GetProjectForFile(filePath);
+                        if (pid != Guid.Empty)
+                        {
+                            _currentProjectId = pid;
+                            FirmOSApp.Log($"[ActivityPane] Resolved project {pid} from {System.IO.Path.GetFileName(filePath)}");
+                        }
+                    }
+                }
+
                 // Fire all three requests in parallel
                 var taskProject = _currentProjectId != Guid.Empty
                     ? ApiClient.Instance.GetProjectActivityAsync(_currentProjectId)

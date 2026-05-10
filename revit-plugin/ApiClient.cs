@@ -165,11 +165,24 @@ namespace FirmOS.Revit
             Log($"GetMyTasksAsync ▶ GET {url}");
             HttpResponseMessage resp;
             try { resp = await _http.GetAsync(url).ConfigureAwait(false); }
-            catch (Exception ex) { Log($"GetMyTasksAsync ✗ {ex.Message}"); return new List<TaskItem>(); }
+            catch (Exception ex)
+            {
+                Log($"GetMyTasksAsync ✗ network error: {ex.Message}");
+                return new List<TaskItem>();
+            }
 
             var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            if (!resp.IsSuccessStatusCode) { Log($"GetMyTasksAsync ✗ {(int)resp.StatusCode}"); return new List<TaskItem>(); }
-            return JsonConvert.DeserializeObject<List<TaskItem>>(body) ?? new List<TaskItem>();
+            Log($"GetMyTasksAsync ◀ {(int)resp.StatusCode}: {Truncate(body, 500)}");
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                Log($"GetMyTasksAsync ✗ non-2xx — returning empty list");
+                return new List<TaskItem>();
+            }
+
+            var items = JsonConvert.DeserializeObject<List<TaskItem>>(body) ?? new List<TaskItem>();
+            Log($"GetMyTasksAsync ◀ {items.Count} task(s) parsed");
+            return items;
         }
 
         /// <summary>Returns online users for the current firm.</summary>

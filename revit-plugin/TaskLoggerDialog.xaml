@@ -3,12 +3,12 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Log Work — Vitruvius"
-    Width="380"
-    Height="480"
+    Width="400"
+    Height="540"
     MinWidth="340"
-    MinHeight="440"
+    MinHeight="480"
     WindowStartupLocation="CenterScreen"
-    ResizeMode="NoResize"
+    ResizeMode="CanResize"
     Background="#1e1f22"
     Foreground="#dcddde"
     FontFamily="Segoe UI"
@@ -199,184 +199,171 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- title -->
-            <RowDefinition Height="14"/>
-            <RowDefinition Height="Auto"/>  <!-- task selector -->
-            <RowDefinition Height="16"/>
-            <!-- Timer display -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
-            <!-- Started-at label (visible only when running) -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <!-- Start / Stop button -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="14"/>
-            <!-- Divider "or log manually" -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <!-- Manual section (collapsed when running) -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="*"/>     <!-- notes -->
-            <RowDefinition Height="10"/>
-            <!-- Mark done -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="14"/>
-            <!-- Confirm toast -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="14"/>
-            <!-- Bottom buttons -->
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <!--
+        DockPanel root: footer is docked to the Bottom so it is ALWAYS visible
+        regardless of window height. The ScrollViewer fills remaining space.
+    -->
+    <DockPanel LastChildFill="True">
 
-        <!-- ── Title ── -->
-        <StackPanel Grid.Row="0">
-            <TextBlock Text="Log Work"
-                       FontSize="17"
-                       FontWeight="Bold"
-                       Foreground="#dcddde"/>
-            <TextBlock x:Name="SubtitleLabel"
-                       Text="Start the timer or enter a duration manually."
-                       Foreground="#80848e"
-                       FontSize="11"
-                       Margin="0,2,0,0"/>
-        </StackPanel>
-
-        <!-- ── Task selector ── -->
-        <StackPanel Grid.Row="2">
-            <TextBlock Text="Task" Style="{StaticResource Label}"/>
-            <ComboBox x:Name="TaskCombo" DisplayMemberPath="Title">
-                <ComboBox.Resources>
-                    <Style TargetType="ComboBoxItem">
-                        <Setter Property="Background" Value="#2b2d31"/>
-                        <Setter Property="Foreground" Value="#dcddde"/>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#40444b"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#5865f2"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </ComboBox.Resources>
-            </ComboBox>
-            <TextBlock x:Name="NoTasksHint"
-                       Text="No tasks assigned to you. Ask a project manager to assign tasks."
-                       Foreground="#80848e"
-                       FontSize="10"
-                       Margin="0,4,0,0"
-                       Visibility="Collapsed"/>
-        </StackPanel>
-
-        <!-- ── Timer display ── -->
-        <TextBlock Grid.Row="4"
-                   x:Name="TimerDisplay"
-                   Text="00:00:00"
-                   FontFamily="Courier New"
-                   FontSize="36"
-                   FontWeight="Bold"
-                   Foreground="White"
-                   TextAlignment="Center"
-                   HorizontalAlignment="Center"/>
-
-        <!-- ── Started-at label ── -->
-        <TextBlock Grid.Row="6"
-                   x:Name="StartedAtLabel"
-                   Text=""
-                   FontSize="11"
-                   Foreground="#a1a1aa"
-                   TextAlignment="Center"
-                   HorizontalAlignment="Center"
-                   Visibility="Collapsed"/>
-
-        <!-- ── Start / Stop button (full width) ── -->
-        <Button Grid.Row="8"
-                x:Name="StartStopBtn"
-                Style="{StaticResource StartBtn}"
-                Content="▶  Start Timer"
-                Click="StartStopBtn_Click"/>
-
-        <!-- ── Divider ── -->
-        <Grid Grid.Row="10" x:Name="DividerRow">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Height="1" Background="#313338" VerticalAlignment="Center"/>
-            <TextBlock Grid.Column="1"
-                       Text=" or log manually "
-                       FontSize="10"
-                       Foreground="#4e5058"
-                       VerticalAlignment="Center"/>
-            <Border Grid.Column="2" Height="1" Background="#313338" VerticalAlignment="Center"/>
-        </Grid>
-
-        <!-- ── Manual section: duration stepper ── -->
-        <StackPanel Grid.Row="12" x:Name="ManualSection">
-            <TextBlock Text="Duration (minutes)" Style="{StaticResource Label}"/>
-            <StackPanel Orientation="Horizontal" Height="34">
-                <Button x:Name="MinusBtn" Style="{StaticResource StepperBtn}" Content="−" Click="MinusBtn_Click"/>
-                <TextBox x:Name="DurationBox" Width="70" Margin="4,0" Text="30" TextAlignment="Center"/>
-                <Button x:Name="PlusBtn"  Style="{StaticResource StepperBtn}" Content="+" Click="PlusBtn_Click"/>
-                <TextBlock Text="min" Foreground="#80848e" FontSize="11"
-                           VerticalAlignment="Center" Margin="8,0,0,0"/>
-            </StackPanel>
-        </StackPanel>
-
-        <!-- ── Notes ── -->
-        <StackPanel Grid.Row="14">
-            <TextBlock Text="Notes (optional)" Style="{StaticResource Label}"/>
-            <TextBox x:Name="NotesBox"
-                     MinHeight="52"
-                     MaxHeight="90"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto"
-                     VerticalContentAlignment="Top"/>
-        </StackPanel>
-
-        <!-- ── Mark done ── -->
-        <CheckBox Grid.Row="16"
-                  x:Name="MarkDoneCheck"
-                  Content="Mark task as done"
-                  Foreground="#dcddde"/>
-
-        <!-- ── Confirmation toast ── -->
-        <Border Grid.Row="18"
-                x:Name="ToastBorder"
-                Background="#14532d"
-                CornerRadius="4"
-                Padding="10,6"
-                Visibility="Collapsed">
-            <TextBlock x:Name="ToastLabel"
-                       Foreground="#86efac"
-                       FontSize="12"
-                       TextAlignment="Center"/>
+        <!-- ── Footer (always pinned) ── -->
+        <Border DockPanel.Dock="Bottom"
+                Background="#1e1f22"
+                BorderBrush="#313338"
+                BorderThickness="0,1,0,0"
+                Padding="20,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0"
+                        x:Name="LogBtn"
+                        Style="{StaticResource PrimaryBtn}"
+                        Content="Log Work"
+                        Click="LogBtn_Click"/>
+                <Button Grid.Column="2"
+                        x:Name="CancelBtn"
+                        Style="{StaticResource SecondaryBtn}"
+                        Content="Cancel"
+                        Click="CancelBtn_Click"/>
+            </Grid>
         </Border>
 
-        <!-- ── Bottom buttons ── -->
-        <Grid Grid.Row="20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="8"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <Button Grid.Column="0"
-                    x:Name="LogBtn"
-                    Style="{StaticResource PrimaryBtn}"
-                    Content="Log Work"
-                    Click="LogBtn_Click"/>
-            <Button Grid.Column="2"
-                    x:Name="CancelBtn"
-                    Style="{StaticResource SecondaryBtn}"
-                    Content="Cancel"
-                    Click="CancelBtn_Click"/>
-        </Grid>
-    </Grid>
+        <!-- ── Scrollable content ── -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20,20,20,12">
+
+                <!-- Title -->
+                <TextBlock Text="Log Work"
+                           FontSize="17"
+                           FontWeight="Bold"
+                           Foreground="#dcddde"/>
+                <TextBlock x:Name="SubtitleLabel"
+                           Text="Start the timer or enter a duration manually."
+                           Foreground="#80848e"
+                           FontSize="11"
+                           Margin="0,2,0,14"/>
+
+                <!-- Task selector -->
+                <TextBlock Text="Task" Style="{StaticResource Label}"/>
+                <ComboBox x:Name="TaskCombo" DisplayMemberPath="Title" Margin="0,0,0,4">
+                    <ComboBox.Resources>
+                        <Style TargetType="ComboBoxItem">
+                            <Setter Property="Background" Value="#2b2d31"/>
+                            <Setter Property="Foreground" Value="#dcddde"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#40444b"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#5865f2"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ComboBox.Resources>
+                </ComboBox>
+                <TextBlock x:Name="NoTasksHint"
+                           Text="No tasks assigned to you. Ask a project manager to assign tasks."
+                           Foreground="#80848e"
+                           FontSize="10"
+                           Margin="0,2,0,0"
+                           Visibility="Collapsed"/>
+
+                <!-- Spacer -->
+                <Border Height="16"/>
+
+                <!-- Timer display -->
+                <TextBlock x:Name="TimerDisplay"
+                           Text="00:00:00"
+                           FontFamily="Courier New"
+                           FontSize="36"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"/>
+
+                <!-- Started-at label -->
+                <TextBlock x:Name="StartedAtLabel"
+                           Text=""
+                           FontSize="11"
+                           Foreground="#a1a1aa"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           Margin="0,4,0,0"
+                           Visibility="Collapsed"/>
+
+                <!-- Spacer -->
+                <Border Height="8"/>
+
+                <!-- Start / Stop button (full width) -->
+                <Button x:Name="StartStopBtn"
+                        Style="{StaticResource StartBtn}"
+                        Content="&#x25B6;  Start Timer"
+                        Click="StartStopBtn_Click"
+                        Margin="0,0,0,14"/>
+
+                <!-- Divider "or log manually" -->
+                <Grid x:Name="DividerRow" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Height="1" Background="#313338" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1"
+                               Text=" or log manually "
+                               FontSize="10"
+                               Foreground="#4e5058"
+                               VerticalAlignment="Center"/>
+                    <Border Grid.Column="2" Height="1" Background="#313338" VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- Manual section: duration stepper -->
+                <StackPanel x:Name="ManualSection" Margin="0,0,0,12">
+                    <TextBlock Text="Duration (minutes)" Style="{StaticResource Label}"/>
+                    <StackPanel Orientation="Horizontal" Height="34">
+                        <Button x:Name="MinusBtn" Style="{StaticResource StepperBtn}" Content="&#x2212;" Click="MinusBtn_Click"/>
+                        <TextBox x:Name="DurationBox" Width="70" Margin="4,0" Text="30" TextAlignment="Center"/>
+                        <Button x:Name="PlusBtn"  Style="{StaticResource StepperBtn}" Content="+" Click="PlusBtn_Click"/>
+                        <TextBlock Text="min" Foreground="#80848e" FontSize="11"
+                                   VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Notes -->
+                <TextBlock Text="Notes (optional)" Style="{StaticResource Label}"/>
+                <TextBox x:Name="NotesBox"
+                         MinHeight="52"
+                         MaxHeight="90"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         VerticalContentAlignment="Top"
+                         Margin="0,0,0,12"/>
+
+                <!-- Mark done -->
+                <CheckBox x:Name="MarkDoneCheck"
+                          Content="Mark task as done"
+                          Foreground="#dcddde"
+                          Margin="0,0,0,10"/>
+
+                <!-- Confirmation toast -->
+                <Border x:Name="ToastBorder"
+                        Background="#14532d"
+                        CornerRadius="4"
+                        Padding="10,6"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="ToastLabel"
+                               Foreground="#86efac"
+                               FontSize="12"
+                               TextAlignment="Center"/>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+    </DockPanel>
 </Window>

@@ -41,6 +41,15 @@ namespace FirmOS.Revit
         // ── State ─────────────────────────────────────────────────────────────
         private readonly ConcurrentDictionary<string, DateTime> _openTimes = new();
 
+        /// <summary>
+        /// Path of the most-recently opened (non-family) Revit document.
+        /// Read by <see cref="ActivityPaneContent"/> on every refresh so it can
+        /// resolve a project even when the panel was first shown while a document
+        /// was already open (i.e. OnDocumentOpened had already fired before the
+        /// pane was created).
+        /// </summary>
+        internal static string CurrentOpenFilePath { get; private set; }
+
         // Singleton providers kept alive so pane content can be notified later
         private readonly ChatDockablePanel     _chatPanel     = new();
         private readonly ActivityDockablePanel _activityPanel = new();
@@ -227,6 +236,7 @@ namespace FirmOS.Revit
                 if (string.IsNullOrEmpty(path)) return;
 
                 _openTimes[path] = DateTime.UtcNow;
+                CurrentOpenFilePath = path;   // let Activity panel find the project on demand
 
                 var projectId = ProjectMatcher.Instance.GetProjectForFile(path);
                 if (projectId == Guid.Empty) return;
@@ -256,6 +266,11 @@ namespace FirmOS.Revit
 
                 var path = GetFilePath(doc);
                 if (string.IsNullOrEmpty(path)) return;
+
+                // Clear the static reference so the Activity panel knows no
+                // project is active after this document closes.
+                if (CurrentOpenFilePath == path)
+                    CurrentOpenFilePath = null;
 
                 double? duration = null;
                 if (_openTimes.TryRemove(path, out var opened))

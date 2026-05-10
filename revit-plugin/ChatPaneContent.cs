@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -75,7 +76,32 @@ namespace FirmOS.Revit
             try
             {
                 FirmOSApp.Log("[ChatPane] EnsureCoreWebView2Async ▶");
-                await _webView.EnsureCoreWebView2Async();
+
+                // Use an explicit user-data folder to prevent the "Class not
+                // registered" COMException that occurs when WebView2 cannot
+                // locate or create its default user-data directory.
+                var userDataFolder = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Vitruvius", "WebView2Cache");
+                Directory.CreateDirectory(userDataFolder);
+                FirmOSApp.Log($"[ChatPane] WebView2 user-data folder: {userDataFolder}");
+
+                CoreWebView2Environment env;
+                try
+                {
+                    env = await CoreWebView2Environment.CreateAsync(
+                        browserExecutableFolder: null,
+                        userDataFolder: userDataFolder,
+                        options: null).ConfigureAwait(true);
+                }
+                catch (Exception envEx)
+                {
+                    FirmOSApp.LogException("[ChatPane] CoreWebView2Environment.CreateAsync", envEx);
+                    ShowWebView2Missing();
+                    return;
+                }
+
+                await _webView.EnsureCoreWebView2Async(env);
                 FirmOSApp.Log("[ChatPane] CoreWebView2 ready");
 
                 ConfigureWebView2();
@@ -97,7 +123,18 @@ namespace FirmOS.Revit
             catch (Exception ex)
             {
                 FirmOSApp.LogException("[ChatPane] OnLoaded", ex);
-                ShowStatus($"WebView2 initialisation failed:\n{ex.Message}");
+
+                // COMException 0x80040154 = "Class not registered" means the
+                // WebView2 Runtime is not installed on this machine.
+                if (ex is System.Runtime.InteropServices.COMException comEx &&
+                    (uint)comEx.HResult == 0x80040154)
+                {
+                    ShowWebView2Missing();
+                }
+                else
+                {
+                    ShowStatus($"WebView2 initialisation failed:\n{ex.Message}");
+                }
             }
         }
 
@@ -205,6 +242,69 @@ namespace FirmOS.Revit
             _webView.Visibility     = Visibility.Collapsed;
             _statusLabel.Text       = text;
             _statusLabel.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Replaces the loading label with a "WebView2 not installed" panel that
+        /// includes a clickable download link so the user can fix the issue without
+        /// leaving Revit.
+        /// </summary>
+        private void ShowWebView2Missing()
+        {
+            _webView.Visibility     = Visibility.Collapsed;
+            _statusLabel.Visibility = Visibility.Collapsed;
+
+            var root = Content as System.Windows.Controls.Panel;
+            if (root == null) return;
+
+            var stack = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment   = VerticalAlignment.Center,
+                Margin              = new Thickness(20),
+            };
+
+            stack.Children.Add(new TextBlock
+            {
+                Text            = "Microsoft WebView2 Runtime is not installed.",
+                Foreground      = new SolidColorBrush(Color.FromRgb(0xdc, 0xdd, 0xde)),
+                FontSize        = 13,
+                FontWeight      = FontWeights.SemiBold,
+                TextAlignment   = TextAlignment.Center,
+                TextWrapping    = TextWrapping.Wrap,
+            });
+
+            stack.Children.Add(new TextBlock
+            {
+                Text         = "The AI Chat panel requires the WebView2 Runtime.\nClick below to download and install it, then restart Revit.",
+                Foreground   = new SolidColorBrush(Color.FromRgb(0x80, 0x84, 0x8e)),
+                FontSize     = 11,
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                Margin       = new Thickness(0, 8, 0, 12),
+            });
+
+            var link = new System.Windows.Documents.Hyperlink(
+                new System.Windows.Documents.Run("Download WebView2 Runtime"))
+            {
+                NavigateUri = new Uri("https://go.microsoft.com/fwlink/p/?LinkId=2124703"),
+                Foreground  = new SolidColorBrush(Color.FromRgb(0x58, 0x65, 0xf2)),
+            };
+            link.RequestNavigate += (_, args) =>
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName        = args.Uri.AbsoluteUri,
+                    UseShellExecute = true,
+                });
+                args.Handled = true;
+            };
+
+            stack.Children.Add(new TextBlock { Inlines = { link }, TextAlignment = TextAlignment.Center });
+
+            root.Children.Add(stack);
+
+            FirmOSApp.Log("[ChatPane] WebView2 Runtime missing — download prompt shown.");
         }
     }
 }
