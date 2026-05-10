@@ -49,13 +49,18 @@
     <Compile Include="..\..\ProjectMatcher.cs" />
     <Compile Include="..\..\FirmOSApp.cs" />
     <Compile Include="..\..\ConnectCommand.cs" />
+    <!-- Dockable pane providers -->
+    <Compile Include="..\..\ChatDockablePanel.cs" />
+    <Compile Include="..\..\ActivityDockablePanel.cs" />
+    <!-- Pure code-behind (no XAML pair) -->
+    <Compile Include="..\..\ChatPaneContent.cs" />
+    <!-- Toggle commands -->
     <Compile Include="..\..\ToggleChatPaneCommand.cs" />
     <Compile Include="..\..\ToggleActivityPaneCommand.cs" />
     <Compile Include="..\..\TaskLoggerCommand.cs" />
     <!-- XAML code-behind files — must be listed before their <Page> counterpart -->
     <Compile Include="..\..\LoginDialog.xaml.cs" />
     <Compile Include="..\..\ProjectSelectDialog.xaml.cs" />
-    <Compile Include="..\..\ChatPaneContent.xaml.cs" />
     <Compile Include="..\..\ActivityPaneContent.xaml.cs" />
     <Compile Include="..\..\TaskLoggerDialog.xaml.cs" />
   </ItemGroup>

@@ -70,6 +70,9 @@ namespace FirmOS.Revit
         public bool IsLoggedIn() =>
             !string.IsNullOrWhiteSpace(_config?.AccessToken);
 
+        /// <summary>Returns the stored JWT (null if not logged in).</summary>
+        public string GetAccessToken() => _config?.AccessToken;
+
         /// <summary>
         /// POST /auth/login  {"email": "…", "password": "…"}
         /// On success, persists the JWT to config.json and sets the
@@ -146,6 +149,96 @@ namespace FirmOS.Revit
 
             return JsonConvert.DeserializeObject<List<ProjectResponse>>(responseBody)
                    ?? new List<ProjectResponse>();
+        }
+
+        // -----------------------------------------------------------------------
+        // Task + presence API methods (for dockable panels + task logger)
+        // -----------------------------------------------------------------------
+
+        /// <summary>Returns tasks assigned to the current user.</summary>
+        public async Task<List<TaskItem>> GetMyTasksAsync(Guid? projectId)
+        {
+            var url = projectId.HasValue
+                ? $"tasks/my?project_id={projectId}"
+                : "tasks/my";
+
+            Log($"GetMyTasksAsync ▶ GET {url}");
+            HttpResponseMessage resp;
+            try { resp = await _http.GetAsync(url).ConfigureAwait(false); }
+            catch (Exception ex) { Log($"GetMyTasksAsync ✗ {ex.Message}"); return new List<TaskItem>(); }
+
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) { Log($"GetMyTasksAsync ✗ {(int)resp.StatusCode}"); return new List<TaskItem>(); }
+            return JsonConvert.DeserializeObject<List<TaskItem>>(body) ?? new List<TaskItem>();
+        }
+
+        /// <summary>Returns online users for the current firm.</summary>
+        public async Task<List<OnlineUserItem>> GetOnlineUsersAsync()
+        {
+            Log("GetOnlineUsersAsync ▶ GET sessions/online");
+            HttpResponseMessage resp;
+            try { resp = await _http.GetAsync("sessions/online").ConfigureAwait(false); }
+            catch (Exception ex) { Log($"GetOnlineUsersAsync ✗ {ex.Message}"); return new List<OnlineUserItem>(); }
+
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) { Log($"GetOnlineUsersAsync ✗ {(int)resp.StatusCode}"); return new List<OnlineUserItem>(); }
+            return JsonConvert.DeserializeObject<List<OnlineUserItem>>(body) ?? new List<OnlineUserItem>();
+        }
+
+        /// <summary>Returns project health data for use in the Activity panel.</summary>
+        public async Task<ProjectActivityData> GetProjectActivityAsync(Guid projectId)
+        {
+            var url = $"management/project-health";
+            Log($"GetProjectActivityAsync ▶ GET {url}");
+            HttpResponseMessage resp;
+            try { resp = await _http.GetAsync(url).ConfigureAwait(false); }
+            catch (Exception ex) { Log($"GetProjectActivityAsync ✗ {ex.Message}"); return null; }
+
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) return null;
+
+            var list = JsonConvert.DeserializeObject<List<ProjectActivityData>>(body);
+            return list?.Find(p => p.Id == projectId);
+        }
+
+        /// <summary>POST /tasks/{id}/log — log work against a task.</summary>
+        public async Task LogWorkAsync(Guid taskId, int durationMinutes, string notes)
+        {
+            var payload = new TaskLogRequest
+            {
+                DurationMinutes = durationMinutes,
+                Notes           = string.IsNullOrWhiteSpace(notes) ? null : notes,
+                LoggedAt        = DateTime.UtcNow.ToString("o"),
+            };
+            var json    = JsonConvert.SerializeObject(payload, _serializeSettings);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var url     = $"tasks/{taskId}/log";
+
+            Log($"LogWorkAsync ▶ POST {url}");
+            var resp = await _http.PostAsync(url, content).ConfigureAwait(false);
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            Log($"  Response {(int)resp.StatusCode}: {Truncate(body, 200)}");
+
+            if (!resp.IsSuccessStatusCode)
+                throw new HttpRequestException($"HTTP {(int)resp.StatusCode}: {body}");
+        }
+
+        /// <summary>PATCH /tasks/{id} — set status to done.</summary>
+        public async Task MarkTaskDoneAsync(Guid taskId)
+        {
+            var json    = "{\"status\":\"done\"}";
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var url     = $"tasks/{taskId}";
+
+            Log($"MarkTaskDoneAsync ▶ PATCH {url}");
+            var resp = await _http.PatchAsync(url, content).ConfigureAwait(false);
+            Log($"  Response {(int)resp.StatusCode}");
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                throw new HttpRequestException($"HTTP {(int)resp.StatusCode}: {body}");
+            }
         }
 
         /// <summary>

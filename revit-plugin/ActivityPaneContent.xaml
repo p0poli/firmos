@@ -1,0 +1,227 @@
+<UserControl
+    x:Class="FirmOS.Revit.ActivityPaneContent"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="#1e1f22"
+    Foreground="#dcddde"
+    FontFamily="Segoe UI"
+    FontSize="12">
+
+    <UserControl.Resources>
+        <!-- Scrollbar style — dark, thin -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#80848e"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
+        <Style x:Key="CardBorder" TargetType="Border">
+            <Setter Property="Background" Value="#2b2d31"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="PrimaryLabel" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#dcddde"/>
+        </Style>
+
+        <Style x:Key="MutedLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#80848e"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <Style x:Key="RefreshBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#80848e"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="#dcddde"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- header -->
+            <RowDefinition Height="*"/>     <!-- scrollable content -->
+            <RowDefinition Height="Auto"/>  <!-- footer -->
+        </Grid.RowDefinitions>
+
+        <!-- ── Header ── -->
+        <Border Grid.Row="0"
+                Background="#1e1f22"
+                BorderBrush="#313338"
+                BorderThickness="0,0,0,1"
+                Padding="12,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="Model Activity"
+                           FontWeight="SemiBold"
+                           FontSize="13"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1"
+                        x:Name="RefreshButton"
+                        Style="{StaticResource RefreshBtn}"
+                        Click="RefreshButton_Click"
+                        ToolTip="Refresh now">
+                    <TextBlock Text="↻" FontSize="14"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- ── Scrollable content ── -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="12,10">
+            <StackPanel>
+
+                <!-- Loading overlay -->
+                <TextBlock x:Name="LoadingLabel"
+                           Text="Loading…"
+                           Style="{StaticResource MutedLabel}"
+                           HorizontalAlignment="Center"
+                           Margin="0,20,0,0"
+                           Visibility="Collapsed"/>
+
+                <!-- ── Project card ── -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="Current Project"/>
+                <Border Style="{StaticResource CardBorder}" x:Name="ProjectCard">
+                    <StackPanel>
+                        <TextBlock x:Name="ProjectName"
+                                   Style="{StaticResource PrimaryLabel}"
+                                   Text="—"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="ProjectStatus"
+                                   Style="{StaticResource MutedLabel}"
+                                   Margin="0,2,0,6"/>
+                        <!-- Progress bar -->
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0"
+                                    Height="5"
+                                    CornerRadius="2.5"
+                                    Background="#40444b"
+                                    VerticalAlignment="Center">
+                                <Border x:Name="ProgressFill"
+                                        Height="5"
+                                        CornerRadius="2.5"
+                                        Background="#5865f2"
+                                        HorizontalAlignment="Left"
+                                        Width="0"/>
+                            </Border>
+                            <TextBlock Grid.Column="1"
+                                       x:Name="ProgressLabel"
+                                       Style="{StaticResource MutedLabel}"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── My tasks ── -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="My Tasks"/>
+                <ItemsControl x:Name="TasksList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource CardBorder}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Title}"
+                                                   Style="{StaticResource PrimaryLabel}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding StatusLabel}"
+                                                   Style="{StaticResource MutedLabel}"
+                                                   Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding DueDateLabel}"
+                                               Style="{StaticResource MutedLabel}"
+                                               VerticalAlignment="Top"
+                                               Margin="8,0,0,0"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="NoTasksLabel"
+                           Text="No tasks assigned to you."
+                           Style="{StaticResource MutedLabel}"
+                           Margin="0,0,0,12"
+                           Visibility="Collapsed"/>
+
+                <!-- ── Who's online ── -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="Online Now"/>
+                <ItemsControl x:Name="OnlineList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Avatar circle -->
+                                    <Border Width="28" Height="28"
+                                            CornerRadius="14"
+                                            Background="#5865f2"
+                                            Margin="0,0,8,0">
+                                        <TextBlock Text="{Binding Initials}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="White"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding UserName}"
+                                                   Style="{StaticResource PrimaryLabel}"
+                                                   FontSize="12"/>
+                                        <TextBlock Text="{Binding StatusLine}"
+                                                   Style="{StaticResource MutedLabel}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="NoOnlineLabel"
+                           Text="No one else online."
+                           Style="{StaticResource MutedLabel}"
+                           Visibility="Collapsed"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ── Footer — last refresh time ── -->
+        <Border Grid.Row="2"
+                Background="#1e1f22"
+                BorderBrush="#313338"
+                BorderThickness="0,1,0,0"
+                Padding="12,6">
+            <TextBlock x:Name="LastRefreshLabel"
+                       Style="{StaticResource MutedLabel}"
+                       FontSize="10"
+                       HorizontalAlignment="Center"/>
+        </Border>
+    </Grid>
+</UserControl>

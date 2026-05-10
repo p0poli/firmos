@@ -1,0 +1,262 @@
+<Window
+    x:Class="FirmOS.Revit.TaskLoggerDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Log Work — Vitruvius"
+    Width="380"
+    Height="420"
+    MinWidth="340"
+    MinHeight="380"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="NoResize"
+    Background="#1e1f22"
+    Foreground="#dcddde"
+    FontFamily="Segoe UI"
+    FontSize="13">
+
+    <Window.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#80848e"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <Style x:Key="Field" TargetType="Control">
+            <Setter Property="Background" Value="#2b2d31"/>
+            <Setter Property="Foreground" Value="#dcddde"/>
+            <Setter Property="BorderBrush" Value="#40444b"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style TargetType="ComboBox" BasedOn="{StaticResource Field}">
+            <Setter Property="Height" Value="34"/>
+        </Style>
+
+        <Style TargetType="TextBox" BasedOn="{StaticResource Field}">
+            <Setter Property="Height" Value="34"/>
+        </Style>
+
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="#5865f2"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#4752c4"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#b5bac1"/>
+            <Setter Property="BorderBrush" Value="#40444b"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#2b2d31"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="StepperBtn" TargetType="Button">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Background" Value="#2b2d31"/>
+            <Setter Property="Foreground" Value="#dcddde"/>
+            <Setter Property="BorderBrush" Value="#40444b"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#40444b"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- title -->
+            <RowDefinition Height="16"/>   <!-- gap -->
+            <RowDefinition Height="Auto"/> <!-- task selector -->
+            <RowDefinition Height="14"/>
+            <RowDefinition Height="Auto"/> <!-- duration -->
+            <RowDefinition Height="14"/>
+            <RowDefinition Height="*"/>    <!-- notes (fills remaining) -->
+            <RowDefinition Height="14"/>
+            <RowDefinition Height="Auto"/> <!-- mark done checkbox -->
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/> <!-- buttons -->
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Log Work"
+                       FontSize="17"
+                       FontWeight="Bold"
+                       Foreground="#dcddde"/>
+            <TextBlock x:Name="SubtitleLabel"
+                       Text="Select a task and record your time."
+                       Foreground="#80848e"
+                       FontSize="11"
+                       Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <!-- Task selector -->
+        <StackPanel Grid.Row="2">
+            <TextBlock Text="Task" Style="{StaticResource Label}"/>
+            <ComboBox x:Name="TaskCombo"
+                      SelectionChanged="TaskCombo_SelectionChanged"
+                      DisplayMemberPath="Title">
+                <ComboBox.Resources>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="#2b2d31"/>
+                        <Setter Property="Foreground" Value="#dcddde"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#40444b"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#5865f2"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ComboBox.Resources>
+            </ComboBox>
+            <TextBlock x:Name="NoTasksHint"
+                       Text="No tasks assigned to you. Create one below."
+                       Foreground="#80848e"
+                       FontSize="10"
+                       Margin="0,4,0,0"
+                       Visibility="Collapsed"/>
+        </StackPanel>
+
+        <!-- Duration stepper -->
+        <StackPanel Grid.Row="4">
+            <TextBlock Text="Duration (minutes)" Style="{StaticResource Label}"/>
+            <StackPanel Orientation="Horizontal" Height="34">
+                <Button x:Name="MinusBtn"
+                        Style="{StaticResource StepperBtn}"
+                        Content="−"
+                        Click="MinusBtn_Click"/>
+                <TextBox x:Name="DurationBox"
+                         Width="70"
+                         Margin="4,0"
+                         Text="30"
+                         TextAlignment="Center"
+                         VerticalContentAlignment="Center"/>
+                <Button x:Name="PlusBtn"
+                        Style="{StaticResource StepperBtn}"
+                        Content="+"
+                        Click="PlusBtn_Click"/>
+                <TextBlock Text="min"
+                           Foreground="#80848e"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Notes -->
+        <StackPanel Grid.Row="6">
+            <TextBlock Text="Notes (optional)" Style="{StaticResource Label}"/>
+            <TextBox x:Name="NotesBox"
+                     Style="{StaticResource Field}"
+                     Height="Auto"
+                     MinHeight="60"
+                     MaxHeight="120"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     VerticalContentAlignment="Top"/>
+        </StackPanel>
+
+        <!-- Mark done checkbox -->
+        <CheckBox Grid.Row="8"
+                  x:Name="MarkDoneCheck"
+                  Content="Mark task as done"
+                  Foreground="#dcddde"
+                  VerticalAlignment="Center"/>
+
+        <!-- Status label -->
+        <TextBlock x:Name="StatusLabel"
+                   Grid.Row="8"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   Foreground="#80848e"
+                   FontSize="11"
+                   Visibility="Collapsed"/>
+
+        <!-- Buttons -->
+        <Grid Grid.Row="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0"
+                    x:Name="LogBtn"
+                    Style="{StaticResource PrimaryBtn}"
+                    Content="Log Work"
+                    Click="LogBtn_Click"/>
+            <Button Grid.Column="2"
+                    x:Name="CancelBtn"
+                    Style="{StaticResource SecondaryBtn}"
+                    Content="Cancel"
+                    Click="CancelBtn_Click"/>
+        </Grid>
+    </Grid>
+</Window>
