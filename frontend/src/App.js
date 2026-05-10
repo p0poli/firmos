@@ -9,6 +9,7 @@ import Files from "./pages/Files";
 import Gantt from "./pages/Gantt";
 import KnowledgeGraph from "./pages/KnowledgeGraph";
 import Login from "./pages/Login";
+import Management from "./pages/Management/Management";
 import Portfolio from "./pages/Portfolio";
 import ProjectDetail from "./pages/ProjectDetail";
 import Settings from "./pages/Settings";
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="gantt" element={<Gantt />} />
               <Route path="files" element={<Files />} />
               <Route path="knowledge" element={<KnowledgeGraph />} />
+              <Route path="management" element={<Management />} />
               <Route path="settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

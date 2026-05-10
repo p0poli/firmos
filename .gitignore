@@ -21,6 +21,10 @@ npm-debug.log*
 # Revit / .NET
 revit-plugin/bin/
 revit-plugin/obj/
+bin/
+obj/
+.vs/
+*.slnx
 *.user
 *.suo
 

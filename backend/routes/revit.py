@@ -8,6 +8,7 @@ from schemas.revit import (
     CheckResultOut,
     ModelEventCreate,
     ModelEventOut,
+    ModelEventWithContextOut,
 )
 from services import auth_service, knowledge_graph_service, memory_pipeline
 
@@ -99,3 +100,43 @@ def recent_checks(
         .limit(limit)
         .all()
     )
+
+
+@router.get("/events/recent", response_model=list[ModelEventWithContextOut])
+def recent_events(
+    limit: int = Query(default=10, ge=1, le=100),
+    db: OrmSession = Depends(get_db),
+    user: User = Depends(auth_service.get_current_user),
+) -> list[ModelEventWithContextOut]:
+    """
+    Return the most recent Revit model events for the current user's firm,
+    enriched with user_name and project_name for dashboard display.
+    """
+    rows = (
+        db.query(
+            ModelEvent,
+            User.name.label("user_name"),
+            Project.name.label("project_name"),
+        )
+        .join(Project, ModelEvent.project_id == Project.id)
+        .outerjoin(User, ModelEvent.user_id == User.id)
+        .filter(Project.firm_id == user.firm_id)
+        .order_by(ModelEvent.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        ModelEventWithContextOut(
+            id=e.id,
+            event_type=e.event_type,
+            timestamp=e.timestamp,
+            duration=e.duration,
+            revit_file_name=e.revit_file_name,
+            revit_version=e.revit_version,
+            project_id=e.project_id,
+            project_name=p_name,
+            user_id=e.user_id,
+            user_name=u_name,
+        )
+        for e, u_name, p_name in rows
+    ]

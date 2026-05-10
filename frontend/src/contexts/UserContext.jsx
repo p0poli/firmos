@@ -17,6 +17,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -24,6 +25,8 @@ import {
   getModules,
   getRole,
   getStoredModules,
+  getToken,
+  heartbeat,
   setStoredModules,
 } from "../api";
 
@@ -36,6 +39,8 @@ function syncRole(userObj) {
 
 const UserContext = createContext(null);
 
+const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
+
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   // Role is read from localStorage immediately so the dashboard selector
@@ -44,6 +49,7 @@ export function UserProvider({ children }) {
   const [modules, setModulesState] = useState(() => getStoredModules());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const heartbeatRef = useRef(null);
 
   /** Re-fetch user + modules and update all derived state. */
   const refresh = useCallback(async () => {
@@ -60,6 +66,26 @@ export function UserProvider({ children }) {
     }
   }, []);
 
+  /** Start the heartbeat interval (call once after login). */
+  const startHeartbeat = useCallback(() => {
+    if (heartbeatRef.current) return; // already running
+    // Fire immediately so the user is visible online right away.
+    heartbeat().catch(() => {});
+    heartbeatRef.current = setInterval(() => {
+      if (getToken()) {
+        heartbeat().catch(() => {});
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+  }, []);
+
+  /** Stop the heartbeat interval (call on logout). */
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+  }, []);
+
   // Initial load: fetch both in parallel, fail gracefully so a broken
   // /modules/ endpoint doesn't prevent the UI from loading at all.
   useEffect(() => {
@@ -73,6 +99,8 @@ export function UserProvider({ children }) {
         // write it back to localStorage so subsequent renders are instant.
         syncRole(u);
         setRole(u?.role ?? getRole());
+        // Start heartbeat now that we know the user is authenticated.
+        startHeartbeat();
       } else {
         setError(meR.reason);
       }
@@ -86,6 +114,7 @@ export function UserProvider({ children }) {
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -117,6 +146,8 @@ export function UserProvider({ children }) {
         loading,
         error,
         refresh,
+        startHeartbeat,
+        stopHeartbeat,
       }}
     >
       {children}

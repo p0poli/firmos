@@ -11,6 +11,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import {
+  Activity,
   AlertOctagon,
   AlertTriangle,
   BarChart3,
@@ -20,7 +21,6 @@ import {
   Users,
 } from "lucide-react";
 import {
-  Avatar,
   AvatarStack,
   Badge,
   Card,
@@ -32,11 +32,12 @@ import {
   StatCard,
 } from "../../components/ui";
 import {
-  getActiveSessions,
   getFirmInsights,
   getProjectTasks,
+  getRecentEvents,
   listProjects,
 } from "../../api";
+import { WhoIsOnline } from "../../components/WhoIsOnline/WhoIsOnline";
 import { daysFromToday, deadlinePhrase, relativeTime } from "../../lib/dates";
 import styles from "./Dashboard.module.css";
 
@@ -59,7 +60,7 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState(null);
   const [tasksByProject, setTasksByProject] = useState(null);
   const [insights, setInsights] = useState(null);
-  const [activeSessions, setActiveSessions] = useState(null);
+  const [recentEvents, setRecentEvents] = useState(null);
   const [error, setError] = useState(null);
 
   // First batch
@@ -68,13 +69,13 @@ export default function AdminDashboard() {
     Promise.allSettled([
       listProjects(),
       getFirmInsights(15),
-      getActiveSessions(),
-    ]).then(([projR, insR, sessR]) => {
+      getRecentEvents(8),
+    ]).then(([projR, insR, evtR]) => {
       if (cancelled) return;
       if (projR.status === "fulfilled") setProjects(projR.value);
       else setError("Could not load projects.");
       setInsights(insR.status === "fulfilled" ? insR.value : []);
-      setActiveSessions(sessR.status === "fulfilled" ? sessR.value : []);
+      setRecentEvents(evtR.status === "fulfilled" ? evtR.value : []);
     });
     return () => { cancelled = true; };
   }, []);
@@ -145,9 +146,9 @@ export default function AdminDashboard() {
         />
         <StatCard
           label="Team online"
-          value={activeSessions === null ? "—" : activeSessions.length}
+          value="—"
           icon={<Users />}
-          tooltip="Team members with an active session right now"
+          tooltip="See the Who's Online section below"
           onClick={() => navigate("/portfolio")}
         />
         <StatCard
@@ -198,9 +199,20 @@ export default function AdminDashboard() {
         <Card padding="md">
           <CardHeader
             title="Who's online"
-            subtitle="Active sessions across the firm"
+            subtitle="Heartbeat-based presence · refreshes every 60 s"
           />
-          <ActiveSessionsBody items={activeSessions} />
+          <WhoIsOnline />
+        </Card>
+      </section>
+
+      {/* --- 4. Recent Revit activity ------------------------------------ */}
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>Revit activity</h2>
+          <span className={styles.sectionMeta}>Recent model events</span>
+        </header>
+        <Card padding="md">
+          <RecentEventsBody items={recentEvents} />
         </Card>
       </section>
     </div>
@@ -321,41 +333,58 @@ function FirmInsightsBody({ items }) {
   );
 }
 
-function ActiveSessionsBody({ items }) {
-  if (items === null) return <SkeletonGroup count={3} />;
+const EVENT_TYPE_LABEL = {
+  opened:    "Opened",
+  synced:    "Synced",
+  closed:    "Closed",
+  check_run: "Check run",
+};
+
+function RecentEventsBody({ items }) {
+  if (items === null) return <SkeletonGroup count={4} />;
   if (items.length === 0) {
     return (
       <EmptyState
-        icon={Users}
-        title="No one online"
-        description="Active sessions show up here as soon as a teammate logs in."
+        icon={Activity}
+        title="No Revit activity yet"
+        description="Model events from the Revit plugin will appear here once architects start working."
         size="sm"
       />
     );
   }
   return (
-    <ul className={styles.sessionList}>
-      {items.map((s) => (
-        <li key={s.id} className={styles.sessionRow}>
-          <Avatar name={s.user_name} size="md" />
-          <div className={styles.sessionBody}>
-            <span className={styles.sessionName}>{s.user_name}</span>
-            <span className={styles.sessionMeta}>
-              {s.active_project_name ? (
+    <ul className={styles.checkList}>
+      {items.map((e) => (
+        <li key={e.id} className={styles.checkRow}>
+          <span
+            className={`${styles.checkIcon} ${styles["intent-primary"]}`}
+            aria-hidden="true"
+          >
+            <Activity size={16} strokeWidth={2} />
+          </span>
+          <div className={styles.checkBody}>
+            <span className={styles.checkType}>
+              {EVENT_TYPE_LABEL[e.event_type] ?? e.event_type}
+              {e.revit_file_name && (
+                <> &mdash; <em style={{ fontStyle: "normal", opacity: 0.85 }}>{e.revit_file_name}</em></>
+              )}
+            </span>
+            <span className={styles.checkMeta}>
+              {e.user_name ?? "Unknown user"}
+              {e.project_name && (
                 <>
-                  on{" "}
-                  <span className={styles.strong}>{s.active_project_name}</span>
+                  <span className={styles.dotSep}>·</span>
+                  {e.project_name}
                 </>
-              ) : (
-                "no project selected"
               )}
               <span className={styles.dotSep}>·</span>
-              {relativeTime(s.login_time)}
+              {relativeTime(e.timestamp)}
             </span>
           </div>
-          <span className={styles.sessionDot} aria-hidden="true" />
         </li>
       ))}
     </ul>
   );
 }
+
+/* ActiveSessionsBody removed — replaced by <WhoIsOnline /> component */

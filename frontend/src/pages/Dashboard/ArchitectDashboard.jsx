@@ -11,9 +11,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Activity,
   AlertOctagon,
   AlertTriangle,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Inbox,
@@ -21,11 +21,9 @@ import {
   LoaderCircle,
   SendHorizontal,
   Sparkles,
-  XCircle,
 } from "lucide-react";
 import {
   AvatarStack,
-  Avatar,
   Badge,
   Card,
   CardHeader,
@@ -38,12 +36,12 @@ import {
 import { useUser } from "../../contexts/UserContext";
 import {
   askVitruvius,
-  getActiveSessions,
   getProjectTasks,
-  getRecentChecks,
+  getRecentEvents,
   getRecentInsights,
   listProjects,
 } from "../../api";
+import { WhoIsOnline } from "../../components/WhoIsOnline/WhoIsOnline";
 import {
   daysFromToday,
   deadlinePhrase,
@@ -71,8 +69,12 @@ const INSIGHT_ICON = {
   progress_summary: Lightbulb,
 };
 
-const CHECK_ICON   = { pass: CheckCircle2, fail: XCircle, warning: AlertTriangle };
-const CHECK_INTENT = { pass: "success",    fail: "danger", warning: "warning"   };
+const EVENT_TYPE_LABEL = {
+  opened:    "Opened",
+  synced:    "Synced",
+  closed:    "Closed",
+  check_run: "Check run",
+};
 
 const HORIZON_DAYS = 7;
 
@@ -92,9 +94,8 @@ export default function ArchitectDashboard() {
   const [projects, setProjects]           = useState(null);
   const [tasksByProject, setTasksByProject] = useState(null);
   const [insights, setInsights]           = useState(null);
-  const [activeSessions, setActiveSessions] = useState(null);
-  const [recentChecks, setRecentChecks]   = useState(null);
-  const [error, setError]                 = useState(null);
+  const [recentEvents, setRecentEvents] = useState(null);
+  const [error, setError]               = useState(null);
 
   // First batch
   useEffect(() => {
@@ -102,15 +103,13 @@ export default function ArchitectDashboard() {
     Promise.allSettled([
       listProjects(),
       getRecentInsights(5),
-      getActiveSessions(),
-      getRecentChecks(6),
-    ]).then(([projR, insR, sessR, checkR]) => {
+      getRecentEvents(8),
+    ]).then(([projR, insR, evtR]) => {
       if (cancelled) return;
       if (projR.status === "fulfilled") setProjects(projR.value);
       else setError("Could not load projects.");
       setInsights(insR.status === "fulfilled" ? insR.value : []);
-      setActiveSessions(sessR.status === "fulfilled" ? sessR.value : []);
-      setRecentChecks(checkR.status === "fulfilled" ? checkR.value : []);
+      setRecentEvents(evtR.status === "fulfilled" ? evtR.value : []);
     });
     return () => { cancelled = true; };
   }, []);
@@ -252,17 +251,17 @@ export default function ArchitectDashboard() {
         <Card padding="md">
           <CardHeader
             title="Who's online"
-            subtitle="Active sessions across the firm"
+            subtitle="Heartbeat-based presence · refreshes every 60 s"
           />
-          <ActiveSessionsBody items={activeSessions} />
+          <WhoIsOnline />
         </Card>
 
         <Card padding="md">
           <CardHeader
-            title="Recent checks"
-            subtitle="Latest compliance results from Revit"
+            title="Revit activity"
+            subtitle="Recent model events across the firm"
           />
-          <RecentChecksBody items={recentChecks} />
+          <RecentEventsBody items={recentEvents} />
         </Card>
       </section>
     </div>
@@ -587,86 +586,51 @@ function ActiveProjectsRow({ projects, tasksByProject }) {
   );
 }
 
-function ActiveSessionsBody({ items }) {
-  if (items === null) return <SkeletonGroup count={3} />;
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        icon={Inbox}
-        title="No one online"
-        description="Active sessions show up here as soon as a teammate logs in."
-        size="sm"
-      />
-    );
-  }
-  return (
-    <ul className={styles.sessionList}>
-      {items.map((s) => (
-        <li key={s.id} className={styles.sessionRow}>
-          <Avatar name={s.user_name} size="md" />
-          <div className={styles.sessionBody}>
-            <span className={styles.sessionName}>{s.user_name}</span>
-            <span className={styles.sessionMeta}>
-              {s.active_project_name ? (
-                <>on <span className={styles.strong}>{s.active_project_name}</span></>
-              ) : (
-                "no project selected"
-              )}
-              <span className={styles.dotSep}>·</span>
-              {relativeTime(s.login_time)}
-            </span>
-          </div>
-          <span className={styles.sessionDot} aria-hidden="true" />
-        </li>
-      ))}
-    </ul>
-  );
-}
+/* ActiveSessionsBody removed — replaced by shared <WhoIsOnline /> component */
 
-function RecentChecksBody({ items }) {
+function RecentEventsBody({ items }) {
   if (items === null) return <SkeletonGroup count={3} />;
   if (items.length === 0) {
     return (
       <EmptyState
-        icon={CheckCircle2}
-        title="No checks yet"
-        description="Compliance check results from Revit will appear here."
+        icon={Activity}
+        title="No Revit activity yet"
+        description="Model events from the Revit plugin will appear here once architects start working."
         size="sm"
       />
     );
   }
   return (
     <ul className={styles.checkList}>
-      {items.map((c) => {
-        const Icon   = CHECK_ICON[c.status]   ?? CheckCircle2;
-        const intent = CHECK_INTENT[c.status] ?? "neutral";
-        const issuesCount = c.issues?.length ?? 0;
-        return (
-          <li key={c.id} className={styles.checkRow}>
-            <span
-              className={`${styles.checkIcon} ${styles[`intent-${intent}`]}`}
-              aria-hidden="true"
-            >
-              <Icon size={16} strokeWidth={2} />
+      {items.map((e) => (
+        <li key={e.id} className={styles.checkRow}>
+          <span
+            className={`${styles.checkIcon} ${styles["intent-primary"]}`}
+            aria-hidden="true"
+          >
+            <Activity size={16} strokeWidth={2} />
+          </span>
+          <div className={styles.checkBody}>
+            <span className={styles.checkType}>
+              {EVENT_TYPE_LABEL[e.event_type] ?? e.event_type}
+              {e.revit_file_name && (
+                <> &mdash; <em style={{ fontStyle: "normal", opacity: 0.85 }}>{e.revit_file_name}</em></>
+              )}
             </span>
-            <div className={styles.checkBody}>
-              <span className={styles.checkType}>
-                {c.check_type.replace(/_/g, " ")}
-              </span>
-              <span className={styles.checkMeta}>
-                {issuesCount > 0
-                  ? `${issuesCount} ${issuesCount === 1 ? "issue" : "issues"}`
-                  : "no issues"}
-                <span className={styles.dotSep}>·</span>
-                {relativeTime(c.timestamp)}
-              </span>
-            </div>
-            <Badge variant={intent} size="sm">
-              {c.status}
-            </Badge>
-          </li>
-        );
-      })}
+            <span className={styles.checkMeta}>
+              {e.user_name ?? "Unknown user"}
+              {e.project_name && (
+                <>
+                  <span className={styles.dotSep}>·</span>
+                  {e.project_name}
+                </>
+              )}
+              <span className={styles.dotSep}>·</span>
+              {relativeTime(e.timestamp)}
+            </span>
+          </div>
+        </li>
+      ))}
     </ul>
   );
 }

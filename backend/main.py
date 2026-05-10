@@ -16,6 +16,7 @@ from routes import (
     files,
     insights,
     knowledge,
+    management,
     modules,
     projects,
     revit,
@@ -102,6 +103,7 @@ app.include_router(sessions.router)
 app.include_router(revit.router)
 app.include_router(knowledge.router)
 app.include_router(insights.router)
+app.include_router(management.router)
 app.include_router(modules.router)
 app.include_router(settings_route.router)
 

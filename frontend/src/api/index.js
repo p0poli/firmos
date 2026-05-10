@@ -132,6 +132,22 @@ export const getMySessions = () =>
   api.get("/sessions/me").then((r) => r.data);
 export const getActiveSessions = () =>
   api.get("/sessions/active").then((r) => r.data);
+
+/**
+ * Heartbeat — keeps the current user's session marked as online.
+ * Called every 5 minutes by UserContext after login.
+ * Returns { session_id, last_seen }.
+ */
+export const heartbeat = () =>
+  api.post("/sessions/heartbeat").then((r) => r.data);
+
+/**
+ * Online users — returns users whose session is active AND last_seen < 20 min.
+ * Enriched with in_revit flag and last_revit_file.
+ */
+export const getOnlineUsers = () =>
+  api.get("/sessions/online").then((r) => r.data);
+
 export const setSessionProject = (sessionId, projectId) =>
   api
     .patch(`/sessions/${sessionId}/project`, { project_id: projectId })
@@ -139,6 +155,14 @@ export const setSessionProject = (sessionId, projectId) =>
 
 export const getRecentChecks = (limit = 10) =>
   api.get("/revit/checks/recent", { params: { limit } }).then((r) => r.data);
+
+/**
+ * Fetch the most recent Revit model events for the firm, enriched with
+ * user_name and project_name (GET /revit/events/recent).
+ */
+export const getRecentEvents = (limit = 10) =>
+  api.get("/revit/events/recent", { params: { limit } }).then((r) => r.data);
+
 export const getRecentInsights = (limit = 10) =>
   api.get("/insights/recent", { params: { limit } }).then((r) => r.data);
 
@@ -273,5 +297,32 @@ export const withdrawContribution = (chunkId) =>
  */
 export const getMyContributions = () =>
   api.get("/conversations/my-contributions").then((r) => r.data);
+
+// --- management (admin + project_manager only) ----------------------------
+
+/**
+ * Team utilization for the current period.
+ * period: "week" | "month"
+ */
+export const getTeamUtilization = (period = "week") =>
+  api.get("/management/team-utilization", { params: { period } }).then((r) => r.data);
+
+/**
+ * Chronological activity feed (sessions + Revit events).
+ * before: ISO datetime cursor for pagination (optional).
+ */
+export const getActivityLog = (limit = 50, before = null) =>
+  api
+    .get("/management/activity-log", {
+      params: { limit, ...(before ? { before } : {}) },
+    })
+    .then((r) => r.data);
+
+/**
+ * Project health overview — active projects with task progress,
+ * deadline, overdue count, and last Revit activity.
+ */
+export const getProjectHealth = () =>
+  api.get("/management/project-health").then((r) => r.data);
 
 export default api;

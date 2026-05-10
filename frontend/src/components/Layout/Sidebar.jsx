@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  BarChart2,
   BarChart3,
   Folder,
   Home,
@@ -23,21 +24,36 @@ const ROLE_LABELS = {
   architect: "Architect",
 };
 
-const NAV_ITEMS = [
+// Base nav items — shown to all roles
+const BASE_NAV_ITEMS = [
   { to: "/", icon: Home, label: "Dashboard", end: true },
   { to: "/portfolio", icon: LayoutGrid, label: "Portfolio" },
   { to: "/tasks", icon: ListChecks, label: "Tasks" },
   { to: "/gantt", icon: BarChart3, label: "Gantt" },
   { to: "/files", icon: Folder, label: "Files" },
   { to: "/knowledge", icon: Network, label: "Knowledge Graph" },
+];
+
+// Management — admin + project_manager only
+const MANAGER_NAV_ITEMS = [
+  { to: "/management", icon: BarChart2, label: "Management" },
+];
+
+const SETTINGS_NAV_ITEMS = [
   { to: "/settings", icon: SettingsIcon, label: "Settings" },
 ];
 
 export function Sidebar() {
   const navigate = useNavigate();
-  const { user, role, loading } = useUser();
+  const { user, role, loading, stopHeartbeat, isAdmin, isProjectManager } = useUser();
+  const navItems = [
+    ...BASE_NAV_ITEMS,
+    ...(isAdmin || isProjectManager ? MANAGER_NAV_ITEMS : []),
+    ...SETTINGS_NAV_ITEMS,
+  ];
 
   const handleLogout = async () => {
+    stopHeartbeat();
     try {
       await logout();
     } finally {
@@ -55,7 +71,7 @@ export function Sidebar() {
       </div>
 
       <nav className={styles.nav}>
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <SidebarNavItem key={item.to} {...item} />
         ))}
       </nav>

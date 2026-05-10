@@ -27,7 +27,8 @@ def login(payload: LoginRequest, db: OrmSession = Depends(get_db)) -> TokenRespo
         "JWT role for %s: db_role=%r role_value=%r", user.email, user.role, role_value
     )
 
-    sess = Session(user_id=user.id, login_time=datetime.utcnow())
+    _now = datetime.utcnow()
+    sess = Session(user_id=user.id, login_time=_now, last_seen=_now)
     db.add(sess)
     db.commit()
     db.refresh(sess)
@@ -49,7 +50,9 @@ def logout(
     )
     if sess is None:
         return {"status": "no active session"}
-    sess.logout_time = datetime.utcnow()
+    now = datetime.utcnow()
+    sess.logout_time = now
+    sess.last_seen   = now
     sess.duration = int((sess.logout_time - sess.login_time).total_seconds())
     db.commit()
     return {"status": "ok", "session_id": str(sess.id), "duration": sess.duration}

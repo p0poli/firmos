@@ -36,6 +36,7 @@ import {
   getRecentChecks,
   listProjects,
 } from "../../api";
+import { WhoIsOnline } from "../../components/WhoIsOnline/WhoIsOnline";
 import {
   daysFromToday,
   deadlinePhrase,
@@ -306,6 +307,17 @@ export default function ProjectManagerDashboard() {
             </Card>
           </LockedModule>
         )}
+      </section>
+
+      {/* --- Who is online ----------------------------------------------- */}
+      <section className={styles.section}>
+        <Card padding="md">
+          <CardHeader
+            title="Who's online"
+            subtitle="Heartbeat-based presence · refreshes every 60 s"
+          />
+          <WhoIsOnline />
+        </Card>
       </section>
     </div>
   );
