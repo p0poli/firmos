@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
@@ -35,5 +35,22 @@ class TaskOut(BaseModel):
     due_date: Optional[date]
     project_id: UUID
     assigned_user_id: Optional[UUID]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TaskLogCreate(BaseModel):
+    duration_minutes: int           # how long the work took
+    notes: Optional[str] = None     # free-text notes
+    logged_at: Optional[datetime] = None  # defaults to server now
+
+
+class TaskLogOut(BaseModel):
+    id: UUID
+    task_id: UUID
+    user_id: UUID
+    duration_minutes: int
+    notes: Optional[str]
+    logged_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

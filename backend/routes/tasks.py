@@ -1,11 +1,12 @@
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session as OrmSession
 
 from database import get_db
-from models import Project, Task, User
-from schemas.task import TaskCreate, TaskOut, TaskUpdate
+from models import Project, Task, TaskLog, User
+from schemas.task import TaskCreate, TaskLogCreate, TaskLogOut, TaskOut, TaskUpdate
 from services import auth_service, knowledge_graph_service, memory_pipeline
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -82,3 +83,45 @@ def delete_task(
     db.delete(task)
     db.commit()
     return None
+
+
+@router.post("/{task_id}/log", response_model=TaskLogOut, status_code=status.HTTP_201_CREATED)
+def log_work(
+    task_id: UUID,
+    payload: TaskLogCreate,
+    db: OrmSession = Depends(get_db),
+    user: User = Depends(auth_service.get_current_user),
+) -> TaskLog:
+    """Log a block of work against a task (Revit plugin Quick Task Logger)."""
+    task = _load_task(db, task_id, user.firm_id)
+    entry = TaskLog(
+        task_id=task.id,
+        user_id=user.id,
+        duration_minutes=payload.duration_minutes,
+        notes=payload.notes,
+        logged_at=payload.logged_at or datetime.utcnow(),
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+@router.get("/my", response_model=list[TaskOut])
+def my_tasks(
+    project_id: UUID | None = None,
+    db: OrmSession = Depends(get_db),
+    user: User = Depends(auth_service.get_current_user),
+) -> list[Task]:
+    """Return tasks assigned to the current user, optionally filtered by project."""
+    q = (
+        db.query(Task)
+        .join(Project, Task.project_id == Project.id)
+        .filter(
+            Project.firm_id == user.firm_id,
+            Task.assigned_user_id == user.id,
+        )
+    )
+    if project_id:
+        q = q.filter(Task.project_id == project_id)
+    return q.order_by(Task.due_date.asc().nullslast()).limit(20).all()

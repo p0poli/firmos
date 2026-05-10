@@ -11,6 +11,7 @@ import KnowledgeGraph from "./pages/KnowledgeGraph";
 import Login from "./pages/Login";
 import Management from "./pages/Management/Management";
 import Portfolio from "./pages/Portfolio";
+import RevitChat from "./pages/RevitChat/RevitChat";
 import ProjectDetail from "./pages/ProjectDetail";
 import Settings from "./pages/Settings";
 import Styleguide from "./pages/Styleguide";
@@ -26,6 +27,9 @@ export default function App() {
         <ChatProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
+            {/* Standalone chat page for the Revit WebView2 dockable panel.
+                No layout — auth handled via localStorage token injected by C#. */}
+            <Route path="/revit-chat" element={<RevitChat />} />
             {/* Public, unauth — visual sanity check for design-system
                 primitives. Mounted at /#/_styleguide; kept around as a
                 live reference for the design system. */}

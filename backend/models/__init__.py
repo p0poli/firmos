@@ -4,6 +4,7 @@ from .user import User, UserRole
 from .session import Session
 from .project import Project, ProjectStatus, project_members
 from .task import Task, TaskStatus, TaskPriority
+from .task_log import TaskLog
 from .file import File, FileSource
 from .model_event import ModelEvent, ModelEventType
 from .check_result import CheckResult, CheckType, CheckStatus
@@ -28,6 +29,7 @@ __all__ = [
     "Task",
     "TaskStatus",
     "TaskPriority",
+    "TaskLog",
     "File",
     "FileSource",
     "ModelEvent",

@@ -47,3 +47,4 @@ class Task(Base):
 
     project = relationship("Project", back_populates="tasks")
     assigned_user = relationship("User", back_populates="assigned_tasks")
+    logs = relationship("TaskLog", back_populates="task", cascade="all, delete-orphan")
