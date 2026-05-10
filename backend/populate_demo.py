@@ -42,6 +42,8 @@ from seed import ensure_firm_modules
 from services import knowledge_graph_service as kg
 from services.auth_service import hash_password
 
+ADMIN_EMAIL = os.getenv("SEED_ADMIN_EMAIL", "parsapoladfar93@gmail.com")
+
 
 # --- helpers ----------------------------------------------------------------
 
@@ -451,6 +453,53 @@ def populate() -> None:
             _, created = _get_or_create_insight(db, p, itype, content, when=now)
             if created:
                 counts["insights"] += 1
+
+        # 9. "The Tower" project + admin task ---------------------------------
+        # Find the admin user by email; skip gracefully if not found.
+        admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+        if admin:
+            tower, tower_created = _get_or_create_project(
+                db,
+                firm,
+                "The Tower",
+                description=(
+                    "High-rise mixed-use tower — residential floors 1-20, "
+                    "commercial podium, and rooftop terrace."
+                ),
+                status=ProjectStatus.active,
+                start_date=today,
+                deadline=today + timedelta(days=90),
+            )
+            if tower_created:
+                counts["projects"] += 1
+                print(f"[project] created: The Tower")
+
+            # Add admin as member if not already
+            if admin.id not in {m.id for m in tower.members}:
+                tower.members.append(admin)
+                counts["memberships"] += 1
+
+            tower_task, ttask_created = _get_or_create_task(
+                db,
+                tower,
+                "Structural review — Tower facade",
+                description=(
+                    "Review and sign off on the structural calculations "
+                    "for the tower facade panels"
+                ),
+                status=TaskStatus.in_progress,
+                priority=TaskPriority.high,
+                due_date=today + timedelta(days=14),
+                assigned_user_id=admin.id,
+            )
+            if ttask_created:
+                counts["tasks"] += 1
+                print(
+                    f"[task] created: 'Structural review — Tower facade' "
+                    f"→ assigned to {ADMIN_EMAIL}"
+                )
+        else:
+            print(f"[admin] user {ADMIN_EMAIL} not found — skipping The Tower task")
 
         db.commit()
 

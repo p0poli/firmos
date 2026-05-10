@@ -54,3 +54,31 @@ class TaskLogOut(BaseModel):
     logged_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── Timer-based time log ──────────────────────────────────────────────────────
+
+class TimeLogCreate(BaseModel):
+    started_at: datetime
+    ended_at: datetime
+    duration_minutes: int
+    notes: Optional[str] = None
+
+
+class TimeLogOut(BaseModel):
+    id: UUID
+    task_id: UUID
+    user_id: UUID
+    started_at: datetime
+    ended_at: datetime
+    duration_minutes: int
+    notes: Optional[str]
+    created_at: datetime
+    user_name: Optional[str] = None   # joined for frontend display
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TimeLogTotalOut(BaseModel):
+    task_id: UUID
+    total_minutes: int

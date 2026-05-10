@@ -201,7 +201,7 @@ namespace FirmOS.Revit
             return list?.Find(p => p.Id == projectId);
         }
 
-        /// <summary>POST /tasks/{id}/log — log work against a task.</summary>
+        /// <summary>POST /tasks/{id}/log — log work against a task (manual entry).</summary>
         public async Task LogWorkAsync(Guid taskId, int durationMinutes, string notes)
         {
             var payload = new TaskLogRequest
@@ -221,6 +221,48 @@ namespace FirmOS.Revit
 
             if (!resp.IsSuccessStatusCode)
                 throw new HttpRequestException($"HTTP {(int)resp.StatusCode}: {body}");
+        }
+
+        /// <summary>POST /tasks/{id}/timelog — log a timed session (started_at → ended_at).</summary>
+        public async Task LogWorkTimedAsync(
+            Guid taskId,
+            DateTime startedAt,
+            DateTime endedAt,
+            int durationMinutes,
+            string notes)
+        {
+            var payload = new TimeLogRequest
+            {
+                StartedAt       = startedAt.ToString("o"),
+                EndedAt         = endedAt.ToString("o"),
+                DurationMinutes = durationMinutes,
+                Notes           = string.IsNullOrWhiteSpace(notes) ? null : notes,
+            };
+            var json    = JsonConvert.SerializeObject(payload, _serializeSettings);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var url     = $"tasks/{taskId}/timelog";
+
+            Log($"LogWorkTimedAsync ▶ POST {url} ({durationMinutes} min)");
+            var resp = await _http.PostAsync(url, content).ConfigureAwait(false);
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            Log($"  Response {(int)resp.StatusCode}: {Truncate(body, 200)}");
+
+            if (!resp.IsSuccessStatusCode)
+                throw new HttpRequestException($"HTTP {(int)resp.StatusCode}: {body}");
+        }
+
+        /// <summary>GET /tasks/{id}/timelogs/total — total logged minutes for a task.</summary>
+        public async Task<int> GetTaskTimeTotalAsync(Guid taskId)
+        {
+            var url = $"tasks/{taskId}/timelogs/total";
+            HttpResponseMessage resp;
+            try { resp = await _http.GetAsync(url).ConfigureAwait(false); }
+            catch { return 0; }
+
+            if (!resp.IsSuccessStatusCode) return 0;
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            var data = JsonConvert.DeserializeObject<TimeLogTotal>(body);
+            return data?.TotalMinutes ?? 0;
         }
 
         /// <summary>PATCH /tasks/{id} — set status to done.</summary>

@@ -71,10 +71,25 @@ namespace FirmOS.Revit
                 var online  = await taskOnline;
 
                 // Marshal to UI thread
+                // Fetch time totals (off UI thread, before marshalling)
+                await PopulateTasksAsync(myTasks);
+
                 await Dispatcher.InvokeAsync(() =>
                 {
                     PopulateProject(project);
-                    PopulateTasks(myTasks);
+                    // Tasks already populated by PopulateTasksAsync but we must
+                    // set ItemsSource on the UI thread
+                    if (myTasks == null || myTasks.Count == 0)
+                    {
+                        TasksList.ItemsSource   = null;
+                        NoTasksLabel.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        NoTasksLabel.Visibility = Visibility.Collapsed;
+                        TasksList.ItemsSource   = myTasks.Count > 5
+                            ? myTasks.GetRange(0, 5) : myTasks;
+                    }
                     PopulateOnline(online);
                     LastRefreshLabel.Text = $"Last refreshed {DateTime.Now:HH:mm:ss}";
                     ShowLoading(false);
@@ -118,7 +133,7 @@ namespace FirmOS.Revit
             ProgressLabel.Text  = $"{data.TasksDone}/{data.TasksTotal}";
         }
 
-        private void PopulateTasks(List<TaskItem> tasks)
+        private async System.Threading.Tasks.Task PopulateTasksAsync(List<TaskItem> tasks)
         {
             if (tasks == null || tasks.Count == 0)
             {
@@ -127,8 +142,18 @@ namespace FirmOS.Revit
                 return;
             }
 
+            // Fetch time totals in parallel for up to 5 tasks (avoid hammering the API)
+            var slice = tasks.Count > 5 ? tasks.GetRange(0, 5) : tasks;
+            var totals = await System.Threading.Tasks.Task.WhenAll(
+                slice.ConvertAll(t =>
+                    ApiClient.Instance.GetTaskTimeTotalAsync(t.Id)
+                        .ContinueWith(r => (t, r.IsCompletedSuccessfully ? r.Result : 0))));
+
+            foreach (var (task, minutes) in totals)
+                task.TotalMinutes = minutes;
+
             NoTasksLabel.Visibility = Visibility.Collapsed;
-            TasksList.ItemsSource   = tasks;
+            TasksList.ItemsSource   = slice;
         }
 
         private void PopulateOnline(List<OnlineUserItem> users)

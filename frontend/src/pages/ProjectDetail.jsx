@@ -6,7 +6,7 @@
  * fetch in parallel on mount so each tab body has its data ready by the
  * time the user clicks it.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertOctagon,
@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clock,
   ExternalLink,
   Inbox,
   Lightbulb,
@@ -40,6 +41,8 @@ import {
   getProjectFiles,
   getProjectInsights,
   getProjectTasks,
+  getTaskTimeLogs,
+  getTaskTimeTotal,
 } from "../api";
 import { GanttChart } from "../components/Gantt";
 import { SourceBadge } from "../components/files/SourceBadge";
@@ -426,6 +429,119 @@ function OverviewTab({ project, tasks, files }) {
   );
 }
 
+// --- Time formatting helpers -----------------------------------------------
+
+function fmtMinutes(total) {
+  if (!total) return null;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+// --- Kanban card with time-log drawer --------------------------------------
+
+function KanbanCard({ task, assignee }) {
+  const days = daysFromToday(task.due_date);
+  const isOverdue = days !== null && days < 0;
+
+  const [timeTotal, setTimeTotal]   = useState(null);   // null = not fetched
+  const [logs, setLogs]             = useState(null);    // null = not fetched
+  const [expanded, setExpanded]     = useState(false);
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  // Fetch total on first render
+  useEffect(() => {
+    getTaskTimeTotal(task.id)
+      .then((d) => setTimeTotal(d.total_minutes ?? 0))
+      .catch(() => setTimeTotal(0));
+  }, [task.id]);
+
+  const toggleLogs = useCallback(async () => {
+    if (expanded) { setExpanded(false); return; }
+    setExpanded(true);
+    if (logs !== null) return;   // already loaded
+    setLogsLoading(true);
+    try {
+      const data = await getTaskTimeLogs(task.id);
+      setLogs(data);
+    } catch {
+      setLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [expanded, logs, task.id]);
+
+  const formatted = fmtMinutes(timeTotal);
+
+  return (
+    <li className={styles.kanbanCard}>
+      <span className={styles.kanbanCardTitle}>{task.title}</span>
+
+      <div className={styles.kanbanCardFooter}>
+        <Badge variant={PRIORITY_TO_VARIANT[task.priority] ?? "neutral"} size="sm">
+          {task.priority}
+        </Badge>
+        {task.due_date && (
+          <span className={`${styles.kanbanDue} ${isOverdue ? styles.kanbanDueOverdue : ""}`}>
+            {shortDate(task.due_date)}
+          </span>
+        )}
+        {assignee ? (
+          <Avatar name={assignee.name} email={assignee.email} size="sm" title={assignee.name} />
+        ) : (
+          <span aria-hidden="true" />
+        )}
+      </div>
+
+      {/* Time logged row */}
+      {formatted && (
+        <button
+          type="button"
+          className={styles.kanbanTimeRow}
+          onClick={toggleLogs}
+          aria-expanded={expanded}
+        >
+          <Clock size={11} strokeWidth={2} />
+          <span>{formatted}</span>
+          {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+        </button>
+      )}
+      {!formatted && timeTotal === 0 && (
+        <span className={styles.kanbanTimeEmpty}>No time logged</span>
+      )}
+
+      {/* Expandable log entries */}
+      {expanded && (
+        <div className={styles.kanbanLogDrawer}>
+          {logsLoading ? (
+            <Skeleton height={16} />
+          ) : logs === null || logs.length === 0 ? (
+            <span className={styles.kanbanLogEmpty}>No time log entries yet.</span>
+          ) : (
+            <ul className={styles.kanbanLogList}>
+              {logs.map((entry) => (
+                <li key={entry.id} className={styles.kanbanLogEntry}>
+                  <Avatar name={entry.user_name} size="sm" />
+                  <div className={styles.kanbanLogEntryBody}>
+                    <span className={styles.kanbanLogEntryMeta}>
+                      {entry.user_name} · {fmtMinutes(entry.duration_minutes)} · {shortDate(entry.started_at)}
+                    </span>
+                    {entry.notes && (
+                      <span className={styles.kanbanLogEntryNotes}>{entry.notes}</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
 // --- Tasks tab (kanban) ----------------------------------------------------
 
 function TasksTab({ tasks, project }) {
@@ -446,7 +562,6 @@ function TasksTab({ tasks, project }) {
     if (grouped[t.status]) grouped[t.status].push(t);
   }
 
-  // Quick lookup for the assignee avatar — falls back to project.members.
   const memberById = Object.fromEntries(
     (project?.members ?? []).map((m) => [m.id, m])
   );
@@ -465,45 +580,13 @@ function TasksTab({ tasks, project }) {
               <div className={styles.kanbanEmpty}>No tasks</div>
             ) : (
               <ul className={styles.kanbanList}>
-                {colTasks.map((t) => {
-                  const assignee = t.assigned_user_id
-                    ? memberById[t.assigned_user_id]
-                    : null;
-                  const days = daysFromToday(t.due_date);
-                  const isOverdue = days !== null && days < 0;
-                  return (
-                    <li key={t.id} className={styles.kanbanCard}>
-                      <span className={styles.kanbanCardTitle}>{t.title}</span>
-                      <div className={styles.kanbanCardFooter}>
-                        <Badge
-                          variant={PRIORITY_TO_VARIANT[t.priority] ?? "neutral"}
-                          size="sm"
-                        >
-                          {t.priority}
-                        </Badge>
-                        {t.due_date && (
-                          <span
-                            className={`${styles.kanbanDue} ${
-                              isOverdue ? styles.kanbanDueOverdue : ""
-                            }`}
-                          >
-                            {shortDate(t.due_date)}
-                          </span>
-                        )}
-                        {assignee ? (
-                          <Avatar
-                            name={assignee.name}
-                            email={assignee.email}
-                            size="sm"
-                            title={assignee.name}
-                          />
-                        ) : (
-                          <span aria-hidden="true" />
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
+                {colTasks.map((t) => (
+                  <KanbanCard
+                    key={t.id}
+                    task={t}
+                    assignee={t.assigned_user_id ? memberById[t.assigned_user_id] : null}
+                  />
+                ))}
               </ul>
             )}
           </Card>

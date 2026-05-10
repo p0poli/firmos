@@ -4,17 +4,19 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Log Work — Vitruvius"
     Width="380"
-    Height="420"
+    Height="480"
     MinWidth="340"
-    MinHeight="380"
+    MinHeight="440"
     WindowStartupLocation="CenterScreen"
     ResizeMode="NoResize"
     Background="#1e1f22"
     Foreground="#dcddde"
     FontFamily="Segoe UI"
-    FontSize="13">
+    FontSize="13"
+    Closing="Window_Closing">
 
     <Window.Resources>
+        <!-- Shared control styles -->
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -22,7 +24,26 @@
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
 
-        <Style x:Key="Field" TargetType="Control">
+        <Style x:Key="PrimaryLabel" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#dcddde"/>
+        </Style>
+
+        <Style x:Key="MutedLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#80848e"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#2b2d31"/>
+            <Setter Property="Foreground" Value="#dcddde"/>
+            <Setter Property="BorderBrush" Value="#40444b"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="8,6"/>
+        </Style>
+
+        <Style TargetType="TextBox">
             <Setter Property="Background" Value="#2b2d31"/>
             <Setter Property="Foreground" Value="#dcddde"/>
             <Setter Property="BorderBrush" Value="#40444b"/>
@@ -31,14 +52,64 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
 
-        <Style TargetType="ComboBox" BasedOn="{StaticResource Field}">
-            <Setter Property="Height" Value="34"/>
+        <!-- Green Start button -->
+        <Style x:Key="StartBtn" TargetType="Button">
+            <Setter Property="Background" Value="#22c55e"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#16a34a"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <Style TargetType="TextBox" BasedOn="{StaticResource Field}">
-            <Setter Property="Height" Value="34"/>
+        <!-- Red Stop button -->
+        <Style x:Key="StopBtn" TargetType="Button">
+            <Setter Property="Background" Value="#ef4444"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#dc2626"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
+        <!-- Primary (blue) Log button -->
         <Style x:Key="PrimaryBtn" TargetType="Button">
             <Setter Property="Background" Value="#5865f2"/>
             <Setter Property="Foreground" Value="White"/>
@@ -68,6 +139,7 @@
             </Setter>
         </Style>
 
+        <!-- Secondary (ghost) Cancel button -->
         <Style x:Key="SecondaryBtn" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#b5bac1"/>
@@ -96,6 +168,7 @@
             </Setter>
         </Style>
 
+        <!-- Duration stepper buttons -->
         <Style x:Key="StepperBtn" TargetType="Button">
             <Setter Property="Width" Value="28"/>
             <Setter Property="Height" Value="34"/>
@@ -128,38 +201,54 @@
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- title -->
-            <RowDefinition Height="16"/>   <!-- gap -->
-            <RowDefinition Height="Auto"/> <!-- task selector -->
+            <RowDefinition Height="Auto"/>  <!-- title -->
             <RowDefinition Height="14"/>
-            <RowDefinition Height="Auto"/> <!-- duration -->
-            <RowDefinition Height="14"/>
-            <RowDefinition Height="*"/>    <!-- notes (fills remaining) -->
-            <RowDefinition Height="14"/>
-            <RowDefinition Height="Auto"/> <!-- mark done checkbox -->
+            <RowDefinition Height="Auto"/>  <!-- task selector -->
             <RowDefinition Height="16"/>
-            <RowDefinition Height="Auto"/> <!-- buttons -->
+            <!-- Timer display -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <!-- Started-at label (visible only when running) -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <!-- Start / Stop button -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
+            <!-- Divider "or log manually" -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <!-- Manual section (collapsed when running) -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>     <!-- notes -->
+            <RowDefinition Height="10"/>
+            <!-- Mark done -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
+            <!-- Confirm toast -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
+            <!-- Bottom buttons -->
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Title -->
+        <!-- ── Title ── -->
         <StackPanel Grid.Row="0">
             <TextBlock Text="Log Work"
                        FontSize="17"
                        FontWeight="Bold"
                        Foreground="#dcddde"/>
             <TextBlock x:Name="SubtitleLabel"
-                       Text="Select a task and record your time."
+                       Text="Start the timer or enter a duration manually."
                        Foreground="#80848e"
                        FontSize="11"
                        Margin="0,2,0,0"/>
         </StackPanel>
 
-        <!-- Task selector -->
+        <!-- ── Task selector ── -->
         <StackPanel Grid.Row="2">
             <TextBlock Text="Task" Style="{StaticResource Label}"/>
-            <ComboBox x:Name="TaskCombo"
-                      SelectionChanged="TaskCombo_SelectionChanged"
-                      DisplayMemberPath="Title">
+            <ComboBox x:Name="TaskCombo" DisplayMemberPath="Title">
                 <ComboBox.Resources>
                     <Style TargetType="ComboBoxItem">
                         <Setter Property="Background" Value="#2b2d31"/>
@@ -177,71 +266,102 @@
                 </ComboBox.Resources>
             </ComboBox>
             <TextBlock x:Name="NoTasksHint"
-                       Text="No tasks assigned to you. Create one below."
+                       Text="No tasks assigned to you. Ask a project manager to assign tasks."
                        Foreground="#80848e"
                        FontSize="10"
                        Margin="0,4,0,0"
                        Visibility="Collapsed"/>
         </StackPanel>
 
-        <!-- Duration stepper -->
-        <StackPanel Grid.Row="4">
+        <!-- ── Timer display ── -->
+        <TextBlock Grid.Row="4"
+                   x:Name="TimerDisplay"
+                   Text="00:00:00"
+                   FontFamily="Courier New"
+                   FontSize="36"
+                   FontWeight="Bold"
+                   Foreground="White"
+                   TextAlignment="Center"
+                   HorizontalAlignment="Center"/>
+
+        <!-- ── Started-at label ── -->
+        <TextBlock Grid.Row="6"
+                   x:Name="StartedAtLabel"
+                   Text=""
+                   FontSize="11"
+                   Foreground="#a1a1aa"
+                   TextAlignment="Center"
+                   HorizontalAlignment="Center"
+                   Visibility="Collapsed"/>
+
+        <!-- ── Start / Stop button (full width) ── -->
+        <Button Grid.Row="8"
+                x:Name="StartStopBtn"
+                Style="{StaticResource StartBtn}"
+                Content="▶  Start Timer"
+                Click="StartStopBtn_Click"/>
+
+        <!-- ── Divider ── -->
+        <Grid Grid.Row="10" x:Name="DividerRow">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Height="1" Background="#313338" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1"
+                       Text=" or log manually "
+                       FontSize="10"
+                       Foreground="#4e5058"
+                       VerticalAlignment="Center"/>
+            <Border Grid.Column="2" Height="1" Background="#313338" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- ── Manual section: duration stepper ── -->
+        <StackPanel Grid.Row="12" x:Name="ManualSection">
             <TextBlock Text="Duration (minutes)" Style="{StaticResource Label}"/>
             <StackPanel Orientation="Horizontal" Height="34">
-                <Button x:Name="MinusBtn"
-                        Style="{StaticResource StepperBtn}"
-                        Content="−"
-                        Click="MinusBtn_Click"/>
-                <TextBox x:Name="DurationBox"
-                         Width="70"
-                         Margin="4,0"
-                         Text="30"
-                         TextAlignment="Center"
-                         VerticalContentAlignment="Center"/>
-                <Button x:Name="PlusBtn"
-                        Style="{StaticResource StepperBtn}"
-                        Content="+"
-                        Click="PlusBtn_Click"/>
-                <TextBlock Text="min"
-                           Foreground="#80848e"
-                           FontSize="11"
-                           VerticalAlignment="Center"
-                           Margin="8,0,0,0"/>
+                <Button x:Name="MinusBtn" Style="{StaticResource StepperBtn}" Content="−" Click="MinusBtn_Click"/>
+                <TextBox x:Name="DurationBox" Width="70" Margin="4,0" Text="30" TextAlignment="Center"/>
+                <Button x:Name="PlusBtn"  Style="{StaticResource StepperBtn}" Content="+" Click="PlusBtn_Click"/>
+                <TextBlock Text="min" Foreground="#80848e" FontSize="11"
+                           VerticalAlignment="Center" Margin="8,0,0,0"/>
             </StackPanel>
         </StackPanel>
 
-        <!-- Notes -->
-        <StackPanel Grid.Row="6">
+        <!-- ── Notes ── -->
+        <StackPanel Grid.Row="14">
             <TextBlock Text="Notes (optional)" Style="{StaticResource Label}"/>
             <TextBox x:Name="NotesBox"
-                     Style="{StaticResource Field}"
-                     Height="Auto"
-                     MinHeight="60"
-                     MaxHeight="120"
+                     MinHeight="52"
+                     MaxHeight="90"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto"
                      VerticalContentAlignment="Top"/>
         </StackPanel>
 
-        <!-- Mark done checkbox -->
-        <CheckBox Grid.Row="8"
+        <!-- ── Mark done ── -->
+        <CheckBox Grid.Row="16"
                   x:Name="MarkDoneCheck"
                   Content="Mark task as done"
-                  Foreground="#dcddde"
-                  VerticalAlignment="Center"/>
+                  Foreground="#dcddde"/>
 
-        <!-- Status label -->
-        <TextBlock x:Name="StatusLabel"
-                   Grid.Row="8"
-                   HorizontalAlignment="Right"
-                   VerticalAlignment="Center"
-                   Foreground="#80848e"
-                   FontSize="11"
-                   Visibility="Collapsed"/>
+        <!-- ── Confirmation toast ── -->
+        <Border Grid.Row="18"
+                x:Name="ToastBorder"
+                Background="#14532d"
+                CornerRadius="4"
+                Padding="10,6"
+                Visibility="Collapsed">
+            <TextBlock x:Name="ToastLabel"
+                       Foreground="#86efac"
+                       FontSize="12"
+                       TextAlignment="Center"/>
+        </Border>
 
-        <!-- Buttons -->
-        <Grid Grid.Row="10">
+        <!-- ── Bottom buttons ── -->
+        <Grid Grid.Row="20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="8"/>

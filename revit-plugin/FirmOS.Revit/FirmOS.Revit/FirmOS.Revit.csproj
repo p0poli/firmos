@@ -10,6 +10,7 @@
     <AssemblyName>FirmOS.Revit</AssemblyName>
     <RootNamespace>FirmOS.Revit</RootNamespace>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
 
     <!--
       CopyLocalLockFileAssemblies=true  → NuGet-provided DLLs (e.g. Newtonsoft.Json)
@@ -54,6 +55,10 @@
     <Compile Include="..\..\ActivityDockablePanel.cs" />
     <!-- Pure code-behind (no XAML pair) -->
     <Compile Include="..\..\ChatPaneContent.cs" />
+    <!-- WPF value converters -->
+    <Compile Include="..\..\Converters.cs" />
+    <!-- System tray -->
+    <Compile Include="..\..\VitruviusTrayIcon.cs" />
     <!-- Toggle commands -->
     <Compile Include="..\..\ToggleChatPaneCommand.cs" />
     <Compile Include="..\..\ToggleActivityPaneCommand.cs" />

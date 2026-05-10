@@ -2,6 +2,7 @@
     x:Class="FirmOS.Revit.ActivityPaneContent"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:FirmOS.Revit"
     Background="#1e1f22"
     Foreground="#dcddde"
     FontFamily="Segoe UI"
@@ -156,6 +157,14 @@
                                         <TextBlock Text="{Binding StatusLabel}"
                                                    Style="{StaticResource MutedLabel}"
                                                    Margin="0,2,0,0"/>
+                                        <!-- Time logged (hidden if 0) -->
+                                        <TextBlock Text="{Binding TotalTimeLabel}"
+                                                   Style="{StaticResource MutedLabel}"
+                                                   Margin="0,2,0,0"
+                                                   Foreground="#6b7280"
+                                                   FontSize="10"
+                                                   Visibility="{Binding TotalTimeLabel,
+                                                       Converter={x:Static local:NonEmptyVisibilityConverter.Instance}}"/>
                                     </StackPanel>
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding DueDateLabel}"

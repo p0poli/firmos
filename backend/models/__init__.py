@@ -5,6 +5,7 @@ from .session import Session
 from .project import Project, ProjectStatus, project_members
 from .task import Task, TaskStatus, TaskPriority
 from .task_log import TaskLog
+from .time_log import TimeLog
 from .file import File, FileSource
 from .model_event import ModelEvent, ModelEventType
 from .check_result import CheckResult, CheckType, CheckStatus
@@ -30,6 +31,7 @@ __all__ = [
     "TaskStatus",
     "TaskPriority",
     "TaskLog",
+    "TimeLog",
     "File",
     "FileSource",
     "ModelEvent",

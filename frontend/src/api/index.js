@@ -325,4 +325,14 @@ export const getActivityLog = (limit = 50, before = null) =>
 export const getProjectHealth = () =>
   api.get("/management/project-health").then((r) => r.data);
 
+// ── Time logs ────────────────────────────────────────────────────────────────
+
+/** Total logged minutes for a task. Returns { task_id, total_minutes }. */
+export const getTaskTimeTotal = (taskId) =>
+  api.get(`/tasks/${taskId}/timelogs/total`).then((r) => r.data);
+
+/** Full list of time log entries for a task, newest first. */
+export const getTaskTimeLogs = (taskId) =>
+  api.get(`/tasks/${taskId}/timelogs`).then((r) => r.data);
+
 export default api;
