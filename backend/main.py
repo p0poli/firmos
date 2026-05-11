@@ -74,6 +74,10 @@ async def lifespan(app: FastAPI):
         # in sync with the spec (e.g. jane → project_manager) even after a
         # database that predates the role-reconciliation logic.
         populate_demo()
+
+        # Step 3: bootstrap knowledge graph from existing data
+        from services.knowledge_bootstrap import bootstrap_knowledge
+        bootstrap_knowledge()
     except SQLAlchemyError as exc:
         # Don't crash the app if the DB isn't reachable or migrations haven't
         # run yet; the operator can still hit /health and investigate.

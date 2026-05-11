@@ -7,7 +7,9 @@ import { UserProvider } from "./contexts/UserContext";
 import Dashboard from "./pages/Dashboard";
 import Files from "./pages/Files";
 import Gantt from "./pages/Gantt";
-import KnowledgeGraph from "./pages/KnowledgeGraph";
+import ProjectGraph from "./pages/ProjectGraph";
+import KnowledgeWeb from "./pages/KnowledgeWeb";
+import MyWorld from "./pages/MyWorld";
 import Login from "./pages/Login";
 import Management from "./pages/Management/Management";
 import Portfolio from "./pages/Portfolio";
@@ -47,7 +49,9 @@ export default function App() {
               <Route path="tasks" element={<Tasks />} />
               <Route path="gantt" element={<Gantt />} />
               <Route path="files" element={<Files />} />
-              <Route path="knowledge" element={<KnowledgeGraph />} />
+              <Route path="knowledge" element={<ProjectGraph />} />
+              <Route path="knowledge-web" element={<KnowledgeWeb />} />
+              <Route path="my-world" element={<MyWorld />} />
               <Route path="management" element={<Management />} />
               <Route path="settings" element={<Settings />} />
             </Route>

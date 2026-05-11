@@ -1,0 +1,59 @@
+@keyframes kpulse {
+  0%, 100% { r: 5; opacity: 1; }
+  50%       { r: 9; opacity: 0.4; }
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  width: 100%;
+  cursor: pointer;
+  background: transparent;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.container:hover {
+  background: var(--color-surface-elevated);
+}
+
+.ring {
+  display: block;
+  flex-shrink: 0;
+}
+
+.pulseDot {
+  animation: kpulse 2s ease-in-out infinite;
+}
+
+.ringPlaceholder {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: #111;
+  opacity: 0.4;
+}
+
+.statsText {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Hide ring text on collapsed sidebar (small screens) */
+@media (max-width: 960px) {
+  .container {
+    padding: var(--space-1);
+  }
+  .ring {
+    width: 40px;
+    height: 40px;
+  }
+  .statsText {
+    display: none;
+  }
+}

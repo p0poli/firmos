@@ -131,6 +131,18 @@
   color: var(--color-danger);
 }
 
+/* --- knowledge pulse section --- */
+
+.pulseSection {
+  padding: 0 var(--space-2);
+}
+
+.pulseDivider {
+  height: 1px;
+  background: #222222;
+  margin-top: var(--space-3);
+}
+
 /* --- collapsed (icon-only) on small screens --- */
 
 @media (max-width: 960px) {

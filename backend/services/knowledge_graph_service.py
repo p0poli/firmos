@@ -176,3 +176,101 @@ def on_insight_generated(db: OrmSession, insight: Insight) -> KnowledgeNode:
     )
     _add_edge(db, insight_node, project_node, RelationshipType.belongs_to)
     return insight_node
+
+
+from datetime import datetime as _datetime
+
+
+async def extract_knowledge_tags(
+    db: OrmSession,
+    text: str,
+    source_project_id=None,
+    source_insight_id=None,
+) -> None:
+    """AI-powered tag extraction.  Calls the configured LLM and parses
+    a JSON array of {label, type, confidence} objects.
+
+    This is a best-effort call — failures are swallowed so the caller is
+    never blocked.  Only tags with confidence > 0.7 are stored.
+    Supported types: regulation | technique | building_type | location | tag
+    """
+    import asyncio
+    import json
+    import logging
+    from config import settings
+
+    logger = logging.getLogger("uvicorn.error")
+
+    # Map AI tag types to NodeType enum values
+    _type_map = {
+        "regulation":    NodeType.regulation,
+        "technique":     NodeType.technique,
+        "building_type": NodeType.building_type,
+        "location":      NodeType.location,
+        "tag":           NodeType.tag,
+    }
+
+    prompt = (
+        "Extract knowledge tags from this text. "
+        "Return ONLY a JSON array of objects: "
+        "[{\"label\": \"tag name\", \"type\": \"regulation|technique|building_type|location|tag\", \"confidence\": 0.0}] "
+        "Only include tags with confidence > 0.7. Return [] if none found.\n\n"
+        f"Text: {text[:2000]}"
+    )
+
+    try:
+        import httpx
+        api_key = settings.anthropic_api_key
+        if not api_key:
+            return
+
+        def _call() -> list[dict]:
+            resp = httpx.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-haiku-4-5",
+                    "max_tokens": 512,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                return []
+            content = resp.json()["content"][0]["text"].strip()
+            # Extract JSON array from response
+            start = content.find("[")
+            end = content.rfind("]") + 1
+            if start == -1 or end == 0:
+                return []
+            return json.loads(content[start:end])
+
+        tags_raw = await asyncio.to_thread(_call)
+
+        if source_project_id:
+            project_node = _get_or_create_node(db, NodeType.project, source_project_id, "")
+
+        for item in tags_raw:
+            if not isinstance(item, dict):
+                continue
+            label = str(item.get("label", "")).strip()
+            tag_type_str = str(item.get("type", "tag"))
+            confidence = float(item.get("confidence", 0))
+            if not label or confidence < 0.7:
+                continue
+            node_type = _type_map.get(tag_type_str, NodeType.tag)
+            import uuid as _uuid
+            ref_id = _uuid.uuid4()
+            node = _get_or_create_node(db, node_type, ref_id, label, metadata={"auto_tagged": True})
+            node.last_active = _datetime.utcnow()
+            if source_project_id:
+                _add_edge(db, node, project_node, RelationshipType.tagged_with)
+
+        db.commit()
+
+    except Exception as e:
+        logger.warning("extract_knowledge_tags failed: %s", e)

@@ -166,8 +166,36 @@ export const getRecentEvents = (limit = 10) =>
 export const getRecentInsights = (limit = 10) =>
   api.get("/insights/recent", { params: { limit } }).then((r) => r.data);
 
+// ---- Knowledge graph v2 ----
 export const getKnowledgeGraph = () =>
   api.get("/knowledge/graph").then((r) => r.data);
+
+export const getKnowledgeWeb = () =>
+  api.get("/knowledge/web").then((r) => r.data);
+
+export const getProjectGraph = (projectId) =>
+  api.get(`/knowledge/project/${projectId}`).then((r) => r.data);
+
+export const getMyWorld = () =>
+  api.get("/knowledge/my-world").then((r) => r.data);
+
+export const searchKnowledge = (q) =>
+  api.get("/knowledge/search", { params: { q } }).then((r) => r.data);
+
+export const getKnowledgeStats = () =>
+  api.get("/knowledge/stats").then((r) => r.data);
+
+export const createKnowledgeNode = (payload) =>
+  api.post("/knowledge/nodes", payload).then((r) => r.data);
+
+export const updateKnowledgeNode = (nodeId, payload) =>
+  api.patch(`/knowledge/nodes/${nodeId}`, payload).then((r) => r.data);
+
+export const deleteKnowledgeNode = (nodeId) =>
+  api.delete(`/knowledge/nodes/${nodeId}`);
+
+export const createKnowledgeEdge = (payload) =>
+  api.post("/knowledge/edges", payload).then((r) => r.data);
 
 // --- users ----------------------------------------------------------------
 
@@ -334,5 +362,9 @@ export const getTaskTimeTotal = (taskId) =>
 /** Full list of time log entries for a task, newest first. */
 export const getTaskTimeLogs = (taskId) =>
   api.get(`/tasks/${taskId}/timelogs`).then((r) => r.data);
+
+/** Log time for a task. payload: { duration_minutes, notes } */
+export const createTimelog = (taskId, payload) =>
+  api.post(`/tasks/${taskId}/timelogs`, payload).then((r) => r.data);
 
 export default api;

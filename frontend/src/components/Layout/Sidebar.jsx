@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import {
   BarChart2,
   BarChart3,
+  Brain,
+  Compass,
   Folder,
+  GitFork,
   Home,
   LayoutGrid,
   ListChecks,
   LogOut,
-  Network,
   Settings as SettingsIcon,
   Squircle,
 } from "lucide-react";
@@ -16,6 +18,7 @@ import { Avatar } from "../ui";
 import { logout } from "../../api";
 import { useUser } from "../../contexts/UserContext";
 import { SidebarNavItem } from "./SidebarNavItem";
+import KnowledgePulse from "../Sidebar/KnowledgePulse";
 import styles from "./Sidebar.module.css";
 
 const ROLE_LABELS = {
@@ -26,12 +29,14 @@ const ROLE_LABELS = {
 
 // Base nav items — shown to all roles
 const BASE_NAV_ITEMS = [
-  { to: "/", icon: Home, label: "Dashboard", end: true },
-  { to: "/portfolio", icon: LayoutGrid, label: "Portfolio" },
-  { to: "/tasks", icon: ListChecks, label: "Tasks" },
-  { to: "/gantt", icon: BarChart3, label: "Gantt" },
-  { to: "/files", icon: Folder, label: "Files" },
-  { to: "/knowledge", icon: Network, label: "Knowledge Graph" },
+  { to: "/my-world",      icon: Compass,    label: "My World" },
+  { to: "/",              icon: Home,       label: "Dashboard", end: true },
+  { to: "/portfolio",     icon: LayoutGrid, label: "Portfolio" },
+  { to: "/tasks",         icon: ListChecks, label: "Tasks" },
+  { to: "/gantt",         icon: BarChart3,  label: "Gantt" },
+  { to: "/files",         icon: Folder,     label: "Files" },
+  { to: "/knowledge",     icon: GitFork,    label: "Project Graph" },
+  { to: "/knowledge-web", icon: Brain,      label: "Knowledge Web" },
 ];
 
 // Management — admin + project_manager only
@@ -75,6 +80,11 @@ export function Sidebar() {
           <SidebarNavItem key={item.to} {...item} />
         ))}
       </nav>
+
+      <div className={styles.pulseSection}>
+        <KnowledgePulse />
+        <div className={styles.pulseDivider} />
+      </div>
 
       <div className={styles.footer}>
         <div className={styles.userCard}>

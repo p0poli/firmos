@@ -1,9 +1,8 @@
 import enum
 import uuid
-
-from sqlalchemy import Column, Enum, String
+from datetime import datetime
+from sqlalchemy import Column, DateTime, Enum, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-
 from database import Base
 
 
@@ -15,6 +14,11 @@ class NodeType(str, enum.Enum):
     regulation = "regulation"
     insight = "insight"
     tag = "tag"
+    building_type = "building_type"
+    location = "location"
+    knowledge = "knowledge"
+    insight_topic = "insight_topic"
+    technique = "technique"
 
 
 class KnowledgeNode(Base):
@@ -27,5 +31,6 @@ class KnowledgeNode(Base):
     )
     reference_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     label = Column(String, nullable=False)
-    # Mapped to DB column "metadata"; Python attribute renamed to avoid clash with SQLAlchemy Base.metadata.
     node_metadata = Column("metadata", JSONB, nullable=False, default=dict)
+    description = Column(Text, nullable=True)
+    last_active = Column(DateTime, nullable=True)
