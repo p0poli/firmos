@@ -21,17 +21,28 @@ import { useNavigate } from "react-router-dom";
 import { useKnowledgeGraph } from "../../contexts/KnowledgeGraphContext";
 import styles from "./SidebarMiniGraph.module.css";
 
-const ACCENT_TYPES = new Set(["regulation", "insight", "insight_topic"]);
-const MAX_NODES    = 100;
-const GRAPH_W      = 192;
-const GRAPH_H      = 200;
+const MAX_NODES = 100;
+const GRAPH_W   = 192;
+const GRAPH_H   = 200;
+
+// Same palette as the main graph — high contrast against #1a1b26
+const TYPE_COLORS = {
+  regulation:    "#22c55e",
+  insight:       "#22c55e",
+  insight_topic: "#22c55e",
+  tag:           "#818cf8",
+  location:      "#34d399",
+  building_type: "#fbbf24",
+  technique:     "#60a5fa",
+  knowledge:     "#c084fc",
+};
 
 function miniColor(node) {
-  if (ACCENT_TYPES.has(node.node_type)) return "#22c55e";
+  if (TYPE_COLORS[node.node_type]) return TYPE_COLORS[node.node_type];
   const w = node.weight || 0;
-  if (w > 15) return "#9ca3af";
-  if (w > 5)  return "#6b7280";
-  return "#4a4f6a";
+  if (w > 10) return "#ffffff";
+  if (w > 3)  return "#a5b4fc";
+  return "#6366f1";
 }
 
 export default function SidebarMiniGraph() {
@@ -56,15 +67,16 @@ export default function SidebarMiniGraph() {
     return { nodes: top, links };
   }, [graphData]);
 
-  // Tighter forces for the small viewport
+  // Very tight forces for the small 192×200 viewport
   useEffect(() => {
     if (miniData.nodes.length === 0) return;
     const timer = setTimeout(() => {
       const fg = fgRef.current;
       if (!fg) return;
-      fg.d3Force("charge")?.strength(-40);
-      fg.d3Force("link")?.distance(20);
-      fg.d3Force("center")?.strength(0.15);
+      fg.d3Force("charge")?.strength(-15);   // very low repulsion → dense cluster
+      fg.d3Force("link")?.distance(15);       // short links → compact
+      fg.d3Force("center")?.strength(0.5);    // strong center pull
+      try { fg.d3Force("collision")?.radius(5); } catch {}
     }, 150);
     return () => clearTimeout(timer);
   }, [miniData.nodes.length]);
@@ -75,10 +87,24 @@ export default function SidebarMiniGraph() {
       const r     = isHov ? 4 : 2.5;
       const color = isHov ? "#ffffff" : miniColor(node);
 
+      ctx.save();
+
+      // Subtle glow — same bloom as main graph, toned down for small size
+      if (isHov) {
+        ctx.shadowColor = "#ffffff";
+        ctx.shadowBlur  = 6;
+      } else {
+        ctx.shadowColor = color;
+        ctx.shadowBlur  = 4;
+      }
+
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.restore();
     },
     [hovered]
   );
@@ -121,7 +147,7 @@ export default function SidebarMiniGraph() {
             nodeCanvasObject={drawNode}
             nodePointerAreaPaint={paintHit}
             nodeLabel={() => ""}
-            linkColor={() => "#2d3148"}
+            linkColor={() => "#3d4270"}
             linkWidth={0.4}
             onNodeClick={handleClick}
             onNodeHover={handleHover}

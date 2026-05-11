@@ -25,27 +25,42 @@ import { useKnowledgeGraph } from "../contexts/KnowledgeGraphContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 import styles from "./KnowledgeWeb.module.css";
 
-// Node types that get the green accent color (regulation, insight)
-const ACCENT_TYPES = new Set(["regulation", "insight", "insight_topic"]);
+// Per-type color palette — high contrast against #1a1b26 background
+const TYPE_COLORS = {
+  regulation:    "#22c55e",   // green  — important, like Obsidian accent
+  insight:       "#22c55e",   // green
+  insight_topic: "#22c55e",   // green
+  tag:           "#818cf8",   // medium indigo
+  location:      "#34d399",   // emerald
+  building_type: "#fbbf24",   // amber
+  technique:     "#60a5fa",   // sky blue
+  knowledge:     "#c084fc",   // purple
+};
+
+/** Base color for a node (ignoring selection/hover state). */
+function baseColor(node) {
+  if (TYPE_COLORS[node.node_type]) return TYPE_COLORS[node.node_type];
+  // Weight-based fallback for any unknown type
+  const w = node.weight || 0;
+  if (w > 10) return "#ffffff";
+  if (w > 3)  return "#a5b4fc";
+  return "#6366f1";
+}
 
 function getNodeColor(node, selectedId, hoveredId, selConnected) {
-  if (node.id === selectedId) return "#ffffff";
-  if (node.id === hoveredId)  return "#ffffff";
-  if (selectedId && selConnected.has(node.id)) return "#22c55e";
-  if (ACCENT_TYPES.has(node.node_type)) return "#22c55e";
-  const w = node.weight || 0;
-  if (w > 15) return "#9ca3af";
-  if (w > 5)  return "#6b7280";
-  return "#4a4f6a";
+  if (node.id === selectedId)                     return "#ffffff";
+  if (node.id === hoveredId)                      return "#ffffff";
+  if (selectedId && selConnected.has(node.id))    return "#22c55e";
+  return baseColor(node);
 }
 
 function getNodeR(node, selectedId, hoveredId) {
   if (node.id === selectedId) return 10;
-  if (node.id === hoveredId)  return 8;
-  if (ACCENT_TYPES.has(node.node_type)) return 7;
+  if (node.id === hoveredId)  return 9;
   const w = node.weight || 0;
-  if (w > 15) return 10;
+  if (w > 10) return 9;
   if (w > 5)  return 6;
+  if (w > 2)  return 5;
   return 4;
 }
 
@@ -116,15 +131,17 @@ export default function KnowledgeWeb() {
     }, 350);
   }, [focusNodeId, graphData.nodes]);
 
-  // Apply Obsidian-like d3 forces once the graph mounts
+  // Apply tight Obsidian-style d3 forces once graph data is present
   useEffect(() => {
     if (graphData.nodes.length === 0) return;
     const timer = setTimeout(() => {
       const fg = fgRef.current;
       if (!fg) return;
-      fg.d3Force("charge")?.strength(-80);
-      fg.d3Force("link")?.distance(40);
-      fg.d3Force("center")?.strength(0.1);
+      fg.d3Force("charge")?.strength(-30);   // was -80; closer clustering
+      fg.d3Force("link")?.distance(25);       // was 40; tighter links
+      fg.d3Force("center")?.strength(0.3);    // was 0.1; stronger center pull
+      // Add collision force if it exists (react-force-graph may or may not set one)
+      try { fg.d3Force("collision")?.radius(8); } catch {}
     }, 120);
     return () => clearTimeout(timer);
   }, [graphData.nodes.length]);
@@ -175,55 +192,55 @@ export default function KnowledgeWeb() {
   // ── Canvas draw ──────────────────────────────────────────────────────────
   const drawNode = useCallback(
     (node, ctx, globalScale) => {
-      const isSelected    = node.id === selectedId;
-      const isHovered     = node.id === hoveredId;
-      const isSelConn     = selectedId && selConnected.has(node.id);
-      const inHovCluster  = hovConnected ? hovConnected.has(node.id) : true;
-      const searchMatch   = !matchIds || matchIds.has(node.id);
+      const isSelected   = node.id === selectedId;
+      const isHovered    = node.id === hoveredId;
+      const isSelConn    = selectedId && selConnected.has(node.id);
+      const inHovCluster = hovConnected ? hovConnected.has(node.id) : true;
+      const searchMatch  = !matchIds || matchIds.has(node.id);
 
       const r     = getNodeR(node, selectedId, hoveredId);
       const color = getNodeColor(node, selectedId, hoveredId, selConnected);
+      const base  = baseColor(node);
 
-      // Dim non-matching nodes
+      // Fade non-matching / non-hovered nodes
       let alpha = 1;
-      if (matchIds && !searchMatch)             alpha = 0.04;
-      else if (hovConnected && !inHovCluster)   alpha = 0.12;
+      if (matchIds && !searchMatch)           alpha = 0.04;
+      else if (hovConnected && !inHovCluster) alpha = 0.10;
 
       ctx.save();
       ctx.globalAlpha = alpha;
 
-      // Glow halo for selected / selected-neighbor / hovered
-      if (isSelected || isHovered || isSelConn) {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, r + 5, 0, 2 * Math.PI);
-        ctx.fillStyle =
-          isSelected || isHovered
-            ? "rgba(255,255,255,0.05)"
-            : "rgba(34,197,94,0.07)";
-        ctx.fill();
+      // ── Glow pass (canvas shadow = Obsidian bloom effect) ────────────
+      if (isSelected || isHovered) {
+        // Strong white glow on selected/hovered
+        ctx.shadowColor = "#ffffff";
+        ctx.shadowBlur  = 15 / globalScale;
+      } else if (alpha > 0.5) {
+        // Subtle type-color glow on all visible nodes
+        ctx.shadowColor = base;
+        ctx.shadowBlur  = 8 / globalScale;
       }
 
-      // Main dot
+      // ── Main dot ─────────────────────────────────────────────────────
       ctx.beginPath();
       ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
 
-      // Label — only on hover, selected, or zoom > 2
+      // Reset shadow so it doesn't bleed into labels
+      ctx.shadowBlur = 0;
+
+      // ── Label — only on hover, selected, or zoom > 2 ─────────────────
       if (isSelected || isHovered || (globalScale > 2 && searchMatch)) {
         const label    = node.label || "";
         const fontSize = Math.max(8, 10 / globalScale);
-        ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
-        ctx.textAlign    = "center";
-        ctx.textBaseline = "bottom";
-        // Drop shadow
+        ctx.font             = `${fontSize}px Inter, system-ui, sans-serif`;
+        ctx.textAlign        = "center";
+        ctx.textBaseline     = "bottom";
+        // Dark drop-shadow for legibility
         ctx.fillStyle = "rgba(0,0,0,0.95)";
         ctx.fillText(label, node.x + 0.5, node.y - r - 3 + 0.5);
-        ctx.fillStyle = isSelected
-          ? "#ffffff"
-          : isHovered
-          ? "#e5e7eb"
-          : "#9ca3af";
+        ctx.fillStyle = isSelected ? "#ffffff" : isHovered ? "#e5e7eb" : "#c4c9f0";
         ctx.fillText(label, node.x, node.y - r - 3);
       }
 
@@ -248,9 +265,9 @@ export default function KnowledgeWeb() {
     (link) => {
       const s = typeof link.source === "object" ? link.source.id : link.source;
       const t = typeof link.target === "object" ? link.target.id : link.target;
-      if (selectedId && (s === selectedId || t === selectedId)) return "#6b7280";
+      if (selectedId && (s === selectedId || t === selectedId)) return "#6366f1";
       if (hoveredId  && (s === hoveredId  || t === hoveredId))  return "#4a5568";
-      return "#2d3148";
+      return "#3d4270";   // was #2d3148 — lighter, actually visible
     },
     [selectedId, hoveredId]
   );
