@@ -67,16 +67,16 @@ export default function SidebarMiniGraph() {
     return { nodes: top, links };
   }, [graphData]);
 
-  // Very tight forces for the small 192×200 viewport
+  // Balanced forces for the small 192×200 viewport
   useEffect(() => {
     if (miniData.nodes.length === 0) return;
     const timer = setTimeout(() => {
       const fg = fgRef.current;
       if (!fg) return;
-      fg.d3Force("charge")?.strength(-15);   // very low repulsion → dense cluster
-      fg.d3Force("link")?.distance(15);       // short links → compact
-      fg.d3Force("center")?.strength(0.5);    // strong center pull
-      try { fg.d3Force("collision")?.radius(5); } catch {}
+      fg.d3Force("charge")?.strength(-25);
+      fg.d3Force("link")?.distance(20);
+      fg.d3Force("center")?.strength(0.3);
+      try { fg.d3Force("collision")?.radius(7); } catch {}
     }, 150);
     return () => clearTimeout(timer);
   }, [miniData.nodes.length]);

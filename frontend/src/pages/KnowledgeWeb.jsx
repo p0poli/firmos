@@ -55,13 +55,12 @@ function getNodeColor(node, selectedId, hoveredId, selConnected) {
 }
 
 function getNodeR(node, selectedId, hoveredId) {
-  if (node.id === selectedId) return 10;
-  if (node.id === hoveredId)  return 9;
+  if (node.id === selectedId) return 9;
+  if (node.id === hoveredId)  return 7;
   const w = node.weight || 0;
-  if (w > 10) return 9;
-  if (w > 5)  return 6;
+  if (w > 10) return 8;
   if (w > 2)  return 5;
-  return 4;
+  return 3;
 }
 
 export default function KnowledgeWeb() {
@@ -131,17 +130,16 @@ export default function KnowledgeWeb() {
     }, 350);
   }, [focusNodeId, graphData.nodes]);
 
-  // Apply tight Obsidian-style d3 forces once graph data is present
+  // Apply balanced d3 forces — middle ground between scattered and too-dense
   useEffect(() => {
     if (graphData.nodes.length === 0) return;
     const timer = setTimeout(() => {
       const fg = fgRef.current;
       if (!fg) return;
-      fg.d3Force("charge")?.strength(-30);   // was -80; closer clustering
-      fg.d3Force("link")?.distance(25);       // was 40; tighter links
-      fg.d3Force("center")?.strength(0.3);    // was 0.1; stronger center pull
-      // Add collision force if it exists (react-force-graph may or may not set one)
-      try { fg.d3Force("collision")?.radius(8); } catch {}
+      fg.d3Force("charge")?.strength(-60);    // middle ground (-80 → -30 → -60)
+      fg.d3Force("link")?.distance(45);        // slightly more space than old 40
+      fg.d3Force("center")?.strength(0.15);    // gentle pull, not dominant
+      try { fg.d3Force("collision")?.radius(12); } catch {}
     }, 120);
     return () => clearTimeout(timer);
   }, [graphData.nodes.length]);
@@ -360,6 +358,7 @@ export default function KnowledgeWeb() {
             width={size.w}
             height={size.h}
             backgroundColor="#1a1b26"
+            nodeRelSize={2.5}
             nodeCanvasObject={drawNode}
             nodePointerAreaPaint={paintHitArea}
             nodeLabel={() => ""}
