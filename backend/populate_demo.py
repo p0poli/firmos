@@ -205,8 +205,8 @@ def populate() -> None:
         # selector has something to demo.
         users_def = [
             ("Jane Cooper", "jane@firmos.dev", UserRole.project_manager),
-            ("Mike Chen", "mike@firmos.dev", UserRole.architect),
-            ("Lina Park", "lina@firmos.dev", UserRole.architect),
+            ("Mike Chen",   "mike@firmos.dev", UserRole.architect),
+            ("Lina Park",   "lina@firmos.dev", UserRole.architect),
         ]
         users = {}
         for name, email, role in users_def:
@@ -220,6 +220,16 @@ def populate() -> None:
             elif role_updated:
                 counts["roles_updated"] = counts.get("roles_updated", 0) + 1
                 print(f"[user] role updated: {email} -> {role.value}")
+
+        # Look up the admin user (registered via the app); add to users dict
+        # so tasks can be assigned to them by ADMIN_EMAIL key.
+        admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+        if admin:
+            users[ADMIN_EMAIL] = admin
+        else:
+            print(f"[admin] {ADMIN_EMAIL} not found — tasks assigned to admin will be skipped")
+
+        A = ADMIN_EMAIL  # shorthand used in tasks_def below
 
         # 3. Projects ------------------------------------------------------
         projects_def = [
@@ -241,6 +251,26 @@ def populate() -> None:
                 deadline=today + timedelta(days=420),
             ),
             dict(
+                name="The Tower",
+                description=(
+                    "High-rise mixed-use tower — residential floors 1-20, "
+                    "commercial podium, and rooftop terrace."
+                ),
+                status=ProjectStatus.active,
+                start_date=today - timedelta(days=30),
+                deadline=today + timedelta(days=90),
+            ),
+            dict(
+                name="Riverside Tram Depot",
+                description=(
+                    "Depot facility for 60 trams — roof structure, "
+                    "maintenance halls, and civil infrastructure."
+                ),
+                status=ProjectStatus.active,
+                start_date=today - timedelta(days=180),
+                deadline=today + timedelta(days=150),
+            ),
+            dict(
                 name="Sundby School Extension",
                 description="Two new classroom blocks and a sports hall.",
                 status=ProjectStatus.on_hold,
@@ -254,16 +284,6 @@ def populate() -> None:
                 start_date=today - timedelta(days=600),
                 deadline=today - timedelta(days=30),
             ),
-            dict(
-                name="Riverside Tram Depot",
-                description=(
-                    "Depot facility serving 60 trams; archived pending council "
-                    "approval."
-                ),
-                status=ProjectStatus.archived,
-                start_date=today - timedelta(days=900),
-                deadline=today - timedelta(days=200),
-            ),
         ]
         projects = {}
         for spec in projects_def:
@@ -274,52 +294,218 @@ def populate() -> None:
                 counts["projects"] += 1
                 print(f"[project] created: {p.name} ({p.status.value})")
 
+        # Riverside Tram Depot may exist as `archived` from a prior run —
+        # flip it to active so the in-progress tasks make sense on the dashboard.
+        depot = projects.get("Riverside Tram Depot")
+        if depot and depot.status == ProjectStatus.archived:
+            depot.status = ProjectStatus.active
+            db.flush()
+            print("[project] Riverside Tram Depot status → active")
+
         # 4. Memberships --------------------------------------------------
         member_assignments = {
-            "Bryggen Hospital — Renovation": ["jane@firmos.dev", "mike@firmos.dev", "lina@firmos.dev"],
-            "Kvartal 7 — Office Tower": ["mike@firmos.dev", "lina@firmos.dev"],
-            "Sundby School Extension": ["mike@firmos.dev"],
-            "Aspely Library Refurbishment": ["jane@firmos.dev", "mike@firmos.dev"],
+            "Bryggen Hospital — Renovation": ["jane@firmos.dev", "mike@firmos.dev", "lina@firmos.dev", A],
+            "Kvartal 7 — Office Tower":      ["jane@firmos.dev", "mike@firmos.dev", "lina@firmos.dev", A],
+            "The Tower":                     ["jane@firmos.dev", "mike@firmos.dev", "lina@firmos.dev", A],
+            "Riverside Tram Depot":          ["jane@firmos.dev", "mike@firmos.dev", "lina@firmos.dev", A],
+            "Sundby School Extension":       ["jane@firmos.dev", "mike@firmos.dev", "lina@firmos.dev", A],
+            "Aspely Library Refurbishment":  ["jane@firmos.dev", "mike@firmos.dev"],
         }
         for proj_name, emails in member_assignments.items():
             p = projects.get(proj_name)
             if p is None:
                 continue
-            existing = {m.id for m in p.members}
+            existing_ids = {m.id for m in p.members}
             for email in emails:
-                u = users[email]
-                if u.id not in existing:
+                u = users.get(email)
+                if u and u.id not in existing_ids:
                     p.members.append(u)
                     counts["memberships"] += 1
 
         # 5. Tasks --------------------------------------------------------
-        # (title, status, priority, due, assignee_email)
+        # Tuple: (title, status, priority, due_date, assignee_email)
+        #
+        # Due-date strategy (mirrors real dashboard urgency indicators):
+        #   done tasks      → past dates
+        #   overdue active  → 1–3 weeks in the past
+        #   due soon        → 2–7 days from now
+        #   normal          → 2–8 weeks from now
         tasks_def = {
+            # ── Bryggen Hospital — Renovation (10 tasks) ─────────────────
             "Bryggen Hospital — Renovation": [
-                ("Demolish west-wing partition walls", TaskStatus.done, TaskPriority.high, today - timedelta(days=60), "jane@firmos.dev"),
-                ("HVAC duct routing review", TaskStatus.in_progress, TaskPriority.high, today + timedelta(days=10), "mike@firmos.dev"),
-                ("Submit fire-rating compliance package", TaskStatus.review, TaskPriority.medium, today + timedelta(days=5), "lina@firmos.dev"),
-                ("Schedule structural engineer site visit", TaskStatus.todo, TaskPriority.medium, today + timedelta(days=14), "jane@firmos.dev"),
+                ("Structural drawings review — West wing",
+                    TaskStatus.in_progress, TaskPriority.high,
+                    today + timedelta(days=5),   "jane@firmos.dev"),
+                ("MEP coordination meeting",
+                    TaskStatus.todo,         TaskPriority.medium,
+                    today + timedelta(days=21),  "mike@firmos.dev"),
+                ("Fire safety compliance check",
+                    TaskStatus.in_progress, TaskPriority.high,
+                    today + timedelta(days=3),   A),
+                ("Accessibility audit — Ground floor",
+                    TaskStatus.review,       TaskPriority.medium,
+                    today + timedelta(days=7),   "lina@firmos.dev"),
+                ("Facade material specification",
+                    TaskStatus.done,         TaskPriority.low,
+                    today - timedelta(days=30),  "jane@firmos.dev"),
+                ("Building permit documentation",
+                    TaskStatus.in_progress, TaskPriority.high,
+                    today - timedelta(days=10),  A),          # overdue
+                ("HVAC system layout approval",
+                    TaskStatus.todo,         TaskPriority.medium,
+                    today + timedelta(days=28),  "mike@firmos.dev"),
+                ("Interior finish schedule",
+                    TaskStatus.todo,         TaskPriority.low,
+                    today + timedelta(days=42),  "lina@firmos.dev"),
+                ("Structural calculations sign-off",
+                    TaskStatus.review,       TaskPriority.high,
+                    today - timedelta(days=7),   "jane@firmos.dev"),  # overdue
+                ("Client presentation — Phase 2",
+                    TaskStatus.todo,         TaskPriority.high,
+                    today + timedelta(days=6),   A),
             ],
+
+            # ── Kvartal 7 — Office Tower (9 tasks) ───────────────────────
             "Kvartal 7 — Office Tower": [
-                ("Curtain-wall panel selection", TaskStatus.in_progress, TaskPriority.medium, today + timedelta(days=20), "mike@firmos.dev"),
-                ("Coordinate MEP shop drawings", TaskStatus.todo, TaskPriority.high, today + timedelta(days=30), "lina@firmos.dev"),
-                ("Lobby finishes mood board", TaskStatus.todo, TaskPriority.low, today + timedelta(days=45), "jane@firmos.dev"),
+                ("Site analysis report",
+                    TaskStatus.done,         TaskPriority.medium,
+                    today - timedelta(days=45),  "mike@firmos.dev"),
+                ("Zoning regulation review",
+                    TaskStatus.done,         TaskPriority.high,
+                    today - timedelta(days=60),  A),
+                ("Concept design — Block A",
+                    TaskStatus.in_progress, TaskPriority.high,
+                    today + timedelta(days=21),  "jane@firmos.dev"),
+                ("Parking layout optimization",
+                    TaskStatus.in_progress, TaskPriority.medium,
+                    today + timedelta(days=30),  "lina@firmos.dev"),
+                ("Sustainability assessment",
+                    TaskStatus.todo,         TaskPriority.medium,
+                    today + timedelta(days=35),  "mike@firmos.dev"),
+                ("Stakeholder presentation prep",
+                    TaskStatus.review,       TaskPriority.high,
+                    today + timedelta(days=4),   A),           # due soon
+                ("Landscape design coordination",
+                    TaskStatus.todo,         TaskPriority.low,
+                    today + timedelta(days=56),  "lina@firmos.dev"),
+                ("Structural grid finalization",
+                    TaskStatus.in_progress, TaskPriority.high,
+                    today - timedelta(days=14),  "jane@firmos.dev"),  # overdue
+                ("Cost estimation review",
+                    TaskStatus.todo,         TaskPriority.medium,
+                    today + timedelta(days=14),  "mike@firmos.dev"),
             ],
+
+            # ── The Tower (12 tasks) ──────────────────────────────────────
+            "The Tower": [
+                ("Structural review — Tower facade",
+                    TaskStatus.in_progress, TaskPriority.high,
+                    today + timedelta(days=14),  A),
+                ("Wind load analysis",
+                    TaskStatus.in_progress, TaskPriority.high,
+                    today - timedelta(days=7),   "jane@firmos.dev"),  # overdue
+                ("Curtain wall system specification",
+                    TaskStatus.todo,         TaskPriority.high,
+                    today + timedelta(days=21),  "mike@firmos.dev"),
+                ("Foundation design approval",
+                    TaskStatus.review,       TaskPriority.high,
+                    today + timedelta(days=5),   "jane@firmos.dev"),  # due soon
+                ("Elevator core coordination",
+                    TaskStatus.in_progress, TaskPriority.medium,
+                    today + timedelta(days=28),  "lina@firmos.dev"),
+                ("Floor plate efficiency analysis",
+                    TaskStatus.todo,         TaskPriority.medium,
+                    today + timedelta(days=35),  A),
+                ("Fire egress planning",
+                    TaskStatus.todo,         TaskPriority.high,
+                    today + timedelta(days=7),   "mike@firmos.dev"),  # due soon
+                ("MEP shaft coordination",
+                    TaskStatus.in_progress, TaskPriority.medium,
+                    today - timedelta(days=3),   "lina@firmos.dev"),  # overdue
+                ("Client design review meeting",
+                    TaskStatus.todo,         TaskPriority.high,
+                    today + timedelta(days=6),   A),           # due soon
+                ("Planning permission submission",
+                    TaskStatus.todo,         TaskPriority.high,
+                    today + timedelta(days=42),  "jane@firmos.dev"),
+                ("Structural steel specification",
+                    TaskStatus.review,       TaskPriority.high,
+                    today - timedelta(days=10),  "mike@firmos.dev"),  # overdue
+                ("Facade panel detail drawings",
+                    TaskStatus.in_progress, TaskPriority.medium,
+                    today + timedelta(days=28),  "lina@firmos.dev"),
+            ],
+
+            # ── Riverside Tram Depot (8 tasks) ────────────────────────────
+            "Riverside Tram Depot": [
+                ("Civil engineering coordination",
+                    TaskStatus.done,         TaskPriority.high,
+                    today - timedelta(days=90),  "mike@firmos.dev"),
+                ("Track layout approval",
+                    TaskStatus.done,         TaskPriority.high,
+                    today - timedelta(days=75),  A),
+                ("Roof structure design",
+                    TaskStatus.in_progress, TaskPriority.high,
+                    today - timedelta(days=14),  "jane@firmos.dev"),  # overdue
+                ("Maintenance facility layout",
+                    TaskStatus.in_progress, TaskPriority.medium,
+                    today - timedelta(days=7),   "lina@firmos.dev"),  # overdue
+                ("Drainage system design",
+                    TaskStatus.todo,         TaskPriority.medium,
+                    today + timedelta(days=21),  "mike@firmos.dev"),
+                ("Electrical infrastructure plan",
+                    TaskStatus.todo,         TaskPriority.high,
+                    today + timedelta(days=14),  A),
+                ("Environmental impact assessment",
+                    TaskStatus.review,       TaskPriority.high,
+                    today - timedelta(days=3),   "jane@firmos.dev"),  # overdue
+                ("Construction phasing plan",
+                    TaskStatus.todo,         TaskPriority.medium,
+                    today + timedelta(days=35),  "lina@firmos.dev"),
+            ],
+
+            # ── Sundby School Extension (6 tasks) ─────────────────────────
             "Sundby School Extension": [
-                ("Site survey re-do", TaskStatus.todo, TaskPriority.high, today + timedelta(days=7), "mike@firmos.dev"),
-                ("Update cost estimate after pause", TaskStatus.todo, TaskPriority.medium, today + timedelta(days=21), "lina@firmos.dev"),
+                ("Initial brief review",
+                    TaskStatus.done,         TaskPriority.medium,
+                    today - timedelta(days=50),  A),
+                ("Site survey coordination",
+                    TaskStatus.done,         TaskPriority.low,
+                    today - timedelta(days=40),  "mike@firmos.dev"),
+                ("Concept sketches — Main building",
+                    TaskStatus.in_progress, TaskPriority.medium,
+                    today + timedelta(days=30),  "jane@firmos.dev"),
+                ("Budget feasibility study",           # waiting on client sign-off
+                    TaskStatus.todo,         TaskPriority.medium,
+                    today + timedelta(days=21),  A),
+                ("Classroom acoustic requirements",
+                    TaskStatus.todo,         TaskPriority.low,
+                    today + timedelta(days=45),  "lina@firmos.dev"),
+                ("Playground safety standards review",
+                    TaskStatus.todo,         TaskPriority.low,
+                    today + timedelta(days=45),  "mike@firmos.dev"),
             ],
+
+            # ── Aspely Library Refurbishment (completed project) ──────────
             "Aspely Library Refurbishment": [
-                ("Final handover walkthrough", TaskStatus.done, TaskPriority.medium, today - timedelta(days=35), "jane@firmos.dev"),
-                ("Archive as-built drawings", TaskStatus.done, TaskPriority.low, today - timedelta(days=20), "mike@firmos.dev"),
+                ("Final handover walkthrough",
+                    TaskStatus.done, TaskPriority.medium,
+                    today - timedelta(days=35),  "jane@firmos.dev"),
+                ("Archive as-built drawings",
+                    TaskStatus.done, TaskPriority.low,
+                    today - timedelta(days=20),  "mike@firmos.dev"),
             ],
         }
+
         for proj_name, tlist in tasks_def.items():
             project = projects.get(proj_name)
             if project is None:
                 continue
             for title, status, priority, due, assignee_email in tlist:
+                assignee = users.get(assignee_email)
+                if assignee is None:
+                    print(f"  [warn] assignee {assignee_email} not found — skipping '{title}'")
+                    continue
                 _, created = _get_or_create_task(
                     db,
                     project,
@@ -328,7 +514,7 @@ def populate() -> None:
                     status=status,
                     priority=priority,
                     due_date=due,
-                    assigned_user_id=users[assignee_email].id,
+                    assigned_user_id=assignee.id,
                 )
                 if created:
                     counts["tasks"] += 1
@@ -428,22 +614,52 @@ def populate() -> None:
             (
                 "Bryggen Hospital — Renovation",
                 InsightType.progress_summary,
-                "1 of 4 tasks complete. HVAC review and the fire-rating compliance package are both progressing on schedule.",
+                (
+                    "2 of 10 tasks complete. Structural drawings and fire safety checks "
+                    "are on the critical path — building permit docs are 10 days overdue."
+                ),
             ),
             (
                 "Bryggen Hospital — Renovation",
                 InsightType.delay_risk,
-                "Fire-rating package is 5 days from due date and still in review — risk of slipping next week.",
+                (
+                    "Building permit documentation is 10 days overdue. Structural "
+                    "calculations sign-off is in review past its deadline — escalate to Jane."
+                ),
             ),
             (
                 "Kvartal 7 — Office Tower",
                 InsightType.progress_summary,
-                "All 3 tasks open; curtain-wall panel selection is underway.",
+                (
+                    "2 of 9 tasks complete. Structural grid finalization is 14 days "
+                    "overdue. Stakeholder presentation is due in 4 days."
+                ),
+            ),
+            (
+                "The Tower",
+                InsightType.delay_risk,
+                (
+                    "Wind load analysis and MEP shaft coordination are both overdue. "
+                    "Structural steel specification is in review past its deadline — "
+                    "foundation approval is due in 5 days."
+                ),
+            ),
+            (
+                "Riverside Tram Depot",
+                InsightType.bottleneck,
+                (
+                    "3 tasks are overdue: roof structure, maintenance facility layout, "
+                    "and environmental impact assessment. Construction phasing is blocked "
+                    "until these clear."
+                ),
             ),
             (
                 "Sundby School Extension",
                 InsightType.bottleneck,
-                "Project is on hold. The re-survey blocks all downstream work — schedule it as soon as the client unblocks the project.",
+                (
+                    "Project is on hold pending client decision. Budget feasibility study "
+                    "is waiting on client sign-off — all downstream tasks blocked until resolved."
+                ),
             ),
         ]
         for proj_name, itype, content in insights_def:
@@ -454,53 +670,6 @@ def populate() -> None:
             if created:
                 counts["insights"] += 1
 
-        # 9. "The Tower" project + admin task ---------------------------------
-        # Find the admin user by email; skip gracefully if not found.
-        admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
-        if admin:
-            tower, tower_created = _get_or_create_project(
-                db,
-                firm,
-                "The Tower",
-                description=(
-                    "High-rise mixed-use tower — residential floors 1-20, "
-                    "commercial podium, and rooftop terrace."
-                ),
-                status=ProjectStatus.active,
-                start_date=today,
-                deadline=today + timedelta(days=90),
-            )
-            if tower_created:
-                counts["projects"] += 1
-                print(f"[project] created: The Tower")
-
-            # Add admin as member if not already
-            if admin.id not in {m.id for m in tower.members}:
-                tower.members.append(admin)
-                counts["memberships"] += 1
-
-            tower_task, ttask_created = _get_or_create_task(
-                db,
-                tower,
-                "Structural review — Tower facade",
-                description=(
-                    "Review and sign off on the structural calculations "
-                    "for the tower facade panels"
-                ),
-                status=TaskStatus.in_progress,
-                priority=TaskPriority.high,
-                due_date=today + timedelta(days=14),
-                assigned_user_id=admin.id,
-            )
-            if ttask_created:
-                counts["tasks"] += 1
-                print(
-                    f"[task] created: 'Structural review — Tower facade' "
-                    f"→ assigned to {ADMIN_EMAIL}"
-                )
-        else:
-            print(f"[admin] user {ADMIN_EMAIL} not found — skipping The Tower task")
-
         db.commit()
 
         print()
@@ -509,10 +678,11 @@ def populate() -> None:
             print(f"  {k}: +{v}")
         print()
         if any(counts.values()):
-            print(f"Demo users login: <email> / {demo_password}")
-            print("  - jane@firmos.dev / Jane Cooper")
-            print("  - mike@firmos.dev / Mike Chen")
-            print("  - lina@firmos.dev / Lina Park")
+            print(f"Demo users (password: {demo_password})")
+            print("  - jane@firmos.dev   / Jane Cooper  (project_manager)")
+            print("  - mike@firmos.dev   / Mike Chen    (architect)")
+            print("  - lina@firmos.dev   / Lina Park    (architect)")
+            print(f"  - {ADMIN_EMAIL} (admin — own password)")
         else:
             print("Nothing to do — all demo records already exist.")
         print("Re-run safely: this script only inserts what is missing.")
