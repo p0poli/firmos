@@ -131,16 +131,26 @@
   color: var(--color-danger);
 }
 
-/* --- knowledge pulse section --- */
+/* --- sidebar mini-graph section --- */
 
-.pulseSection {
-  padding: 0 var(--space-2);
+.miniGraphSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 var(--space-1);
 }
 
-.pulseDivider {
+.miniGraphDivider {
   height: 1px;
-  background: #222222;
+  background: #1e1e1e;
   margin-top: var(--space-3);
+  width: 100%;
+}
+
+@media (max-width: 960px) {
+  .miniGraphSection {
+    display: none;
+  }
 }
 
 /* --- collapsed (icon-only) on small screens --- */

@@ -18,7 +18,7 @@ import { Avatar } from "../ui";
 import { logout } from "../../api";
 import { useUser } from "../../contexts/UserContext";
 import { SidebarNavItem } from "./SidebarNavItem";
-import KnowledgePulse from "../Sidebar/KnowledgePulse";
+import SidebarMiniGraph from "../Sidebar/SidebarMiniGraph";
 import styles from "./Sidebar.module.css";
 
 const ROLE_LABELS = {
@@ -81,9 +81,9 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className={styles.pulseSection}>
-        <KnowledgePulse />
-        <div className={styles.pulseDivider} />
+      <div className={styles.miniGraphSection}>
+        <SidebarMiniGraph />
+        <div className={styles.miniGraphDivider} />
       </div>
 
       <div className={styles.footer}>

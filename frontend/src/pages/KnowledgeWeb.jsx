@@ -1,8 +1,9 @@
 /**
- * KnowledgeWeb — firm-wide concept graph.
+ * KnowledgeWeb — Obsidian-style full-area knowledge graph.
  *
- * Shows only "knowledge" nodes (tags, regulations, techniques, locations, etc.)
- * with glow effects. Left panel for search/filter/details; right panel for graph.
+ * Graph IS the page — no left panel. Floating search top-left,
+ * floating zoom controls bottom-right, detail panel slides in from right
+ * on node click. Dark navy background, organic force-directed layout.
  */
 import React, {
   useCallback,
@@ -13,191 +14,194 @@ import React, {
 } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Brain, Plus, Trash2, X } from "lucide-react";
-import {
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Skeleton,
-} from "../components/ui";
+import { Link, Maximize2, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   createKnowledgeEdge,
   createKnowledgeNode,
   deleteKnowledgeNode,
-  getKnowledgeWeb,
-  searchKnowledge,
   updateKnowledgeNode,
 } from "../api";
+import { useKnowledgeGraph } from "../contexts/KnowledgeGraphContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 import styles from "./KnowledgeWeb.module.css";
 
-const NODE_COLORS = {
-  regulation:    "#ef4444",
-  technique:     "#3b82f6",
-  tag:           "#71717a",
-  building_type: "#f59e0b",
-  location:      "#22c55e",
-  knowledge:     "#8b5cf6",
-  insight_topic: "#06b6d4",
-};
+// Node types that get the green accent color (regulation, insight)
+const ACCENT_TYPES = new Set(["regulation", "insight", "insight_topic"]);
 
-const ALL_TYPES = Object.keys(NODE_COLORS);
+function getNodeColor(node, selectedId, hoveredId, selConnected) {
+  if (node.id === selectedId) return "#ffffff";
+  if (node.id === hoveredId)  return "#ffffff";
+  if (selectedId && selConnected.has(node.id)) return "#22c55e";
+  if (ACCENT_TYPES.has(node.node_type)) return "#22c55e";
+  const w = node.weight || 0;
+  if (w > 15) return "#9ca3af";
+  if (w > 5)  return "#6b7280";
+  return "#4a4f6a";
+}
 
-function nodeRadius(weight) {
-  if (weight <= 3)  return 4;
-  if (weight <= 10) return 8;
-  if (weight <= 30) return 14;
-  return 20;
+function getNodeR(node, selectedId, hoveredId) {
+  if (node.id === selectedId) return 10;
+  if (node.id === hoveredId)  return 8;
+  if (ACCENT_TYPES.has(node.node_type)) return 7;
+  const w = node.weight || 0;
+  if (w > 15) return 10;
+  if (w > 5)  return 6;
+  return 4;
 }
 
 export default function KnowledgeWeb() {
   usePageTitle("Knowledge Web");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const fgRef = useRef(null);
-  const containerRef = useRef(null);
+  const fgRef       = useRef(null);
+  const shellRef    = useRef(null);
 
-  const [rawData, setRawData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState(new Set(ALL_TYPES));
-  const [hoveredId, setHoveredId] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
-  const [size, setSize] = useState({ w: 800, h: 600 });
+  const {
+    rawNodes,
+    graphData,
+    isLoading,
+    focusNodeId,
+    setFocusNodeId,
+    refreshGraph,
+  } = useKnowledgeGraph();
+
+  const [search, setSearch]             = useState("");
+  const [debouncedQ, setDebouncedQ]     = useState("");
+  const [hoveredId, setHoveredId]       = useState(null);
+  const [selectedId, setSelectedId]     = useState(null);
+  const [panelOpen, setPanelOpen]       = useState(false);
+  const [editMode, setEditMode]         = useState(false);
+  const [editLabel, setEditLabel]       = useState("");
+  const [editDesc, setEditDesc]         = useState("");
+  const [contextMenu, setContextMenu]   = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [editLabel, setEditLabel] = useState("");
-  const [editDesc, setEditDesc] = useState("");
-  const [contextMenu, setContextMenu] = useState(null);
+  const [size, setSize] = useState({ w: 900, h: 700 });
 
   // Debounce search
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    const t = setTimeout(() => setDebouncedQ(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  // Load graph
+  // Measure graph shell
   useEffect(() => {
-    setLoading(true);
-    getKnowledgeWeb()
-      .then((data) => {
-        setRawData(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Couldn't load the knowledge web.");
-        setLoading(false);
-      });
+    const el = shellRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setSize({ w: Math.max(300, width), h: Math.max(300, height) });
+    });
+    ro.observe(el);
+    const r = el.getBoundingClientRect();
+    setSize({ w: Math.max(300, r.width), h: Math.max(300, r.height) });
+    return () => ro.disconnect();
   }, []);
 
-  // Focus node from URL param after load
-  const focusNodeId = searchParams.get("focus");
+  // URL ?focus= param — picked up by context effect below
+  const urlFocus = searchParams.get("focus");
   useEffect(() => {
-    if (!focusNodeId || !rawData || !fgRef.current) return;
-    const node = rawData.nodes.find((n) => n.id === focusNodeId);
-    if (node) {
-      setSelectedId(focusNodeId);
-      setTimeout(() => {
-        if (fgRef.current) {
-          fgRef.current.centerAt(node.x ?? 0, node.y ?? 0, 1000);
-          fgRef.current.zoom(3, 1000);
-        }
-      }, 600);
-    }
-  }, [focusNodeId, rawData]);
+    if (urlFocus) setFocusNodeId(urlFocus);
+  }, [urlFocus, setFocusNodeId]);
 
-  // Resize observer
+  // When focusNodeId changes (URL or sidebar click) — zoom there
   useEffect(() => {
-    const measure = () => {
-      if (!containerRef.current) return;
-      const r = containerRef.current.getBoundingClientRect();
-      setSize({ w: Math.max(320, r.width), h: Math.max(360, r.height) });
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [rawData]);
+    if (!focusNodeId || !fgRef.current || graphData.nodes.length === 0) return;
+    const node = graphData.nodes.find((n) => n.id === focusNodeId);
+    if (!node) return;
+    setSelectedId(focusNodeId);
+    setPanelOpen(true);
+    setTimeout(() => {
+      fgRef.current?.centerAt(node.x ?? 0, node.y ?? 0, 800);
+      fgRef.current?.zoom(4, 800);
+    }, 350);
+  }, [focusNodeId, graphData.nodes]);
 
-  const nodeIndex = useMemo(() => {
-    if (!rawData) return {};
-    return Object.fromEntries(rawData.nodes.map((n) => [n.id, n]));
-  }, [rawData]);
+  // Apply Obsidian-like d3 forces once the graph mounts
+  useEffect(() => {
+    if (graphData.nodes.length === 0) return;
+    const timer = setTimeout(() => {
+      const fg = fgRef.current;
+      if (!fg) return;
+      fg.d3Force("charge")?.strength(-80);
+      fg.d3Force("link")?.distance(40);
+      fg.d3Force("center")?.strength(0.1);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [graphData.nodes.length]);
 
-  // Compute node opacities based on search + hover
-  const filteredGraph = useMemo(() => {
-    if (!rawData) return null;
-    const q = debouncedSearch.trim().toLowerCase();
+  // Node lookup
+  const nodeMap = useMemo(
+    () => Object.fromEntries(graphData.nodes.map((n) => [n.id, n])),
+    [graphData.nodes]
+  );
 
-    const visibleNodes = rawData.nodes
-      .filter((n) => typeFilter.has(n.node_type))
-      .map((n) => {
-        const match = !q || n.label.toLowerCase().includes(q);
-        return {
-          id: n.id,
-          label: n.label,
-          node_type: n.node_type,
-          reference_id: n.reference_id,
-          description: n.description,
-          metadata: n.metadata || {},
-          weight: n.weight || 0,
-          color: NODE_COLORS[n.node_type] ?? "#71717a",
-          searchMatch: match,
-          last_active: n.last_active,
-        };
-      });
+  const selectedNode = selectedId ? nodeMap[selectedId] : null;
 
-    const visibleIds = new Set(visibleNodes.map((n) => n.id));
-    const links = rawData.edges
-      .filter((e) => {
-        return visibleIds.has(e.source_node_id) && visibleIds.has(e.target_node_id);
-      })
-      .map((e) => ({
-        source: e.source_node_id,
-        target: e.target_node_id,
-        relationship_type: e.relationship_type,
-      }));
-
-    return { nodes: visibleNodes, links };
-  }, [rawData, debouncedSearch, typeFilter]);
-
-  const selectedNode = selectedId ? nodeIndex[selectedId] : null;
-
-  // Connected node IDs for hover highlight
-  const hoveredConnected = useMemo(() => {
-    if (!hoveredId || !filteredGraph) return new Set();
-    const connected = new Set([hoveredId]);
-    for (const l of filteredGraph.links) {
-      const s = typeof l.source === "object" ? l.source.id : l.source;
-      const t = typeof l.target === "object" ? l.target.id : l.target;
-      if (s === hoveredId) connected.add(t);
-      if (t === hoveredId) connected.add(s);
+  // Connected IDs for the selected node (green highlight)
+  const selConnected = useMemo(() => {
+    if (!selectedId) return new Set();
+    const s = new Set();
+    for (const l of graphData.links) {
+      const src = typeof l.source === "object" ? l.source.id : l.source;
+      const tgt = typeof l.target === "object" ? l.target.id : l.target;
+      if (src === selectedId) s.add(tgt);
+      if (tgt === selectedId) s.add(src);
     }
-    return connected;
-  }, [hoveredId, filteredGraph]);
+    return s;
+  }, [selectedId, graphData.links]);
 
+  // Connected IDs for the hovered node (dim others)
+  const hovConnected = useMemo(() => {
+    if (!hoveredId) return null;
+    const s = new Set([hoveredId]);
+    for (const l of graphData.links) {
+      const src = typeof l.source === "object" ? l.source.id : l.source;
+      const tgt = typeof l.target === "object" ? l.target.id : l.target;
+      if (src === hoveredId) s.add(tgt);
+      if (tgt === hoveredId) s.add(src);
+    }
+    return s;
+  }, [hoveredId, graphData.links]);
+
+  // Search match set
+  const matchIds = useMemo(() => {
+    if (!debouncedQ) return null;
+    const q = debouncedQ.toLowerCase();
+    return new Set(
+      graphData.nodes.filter((n) => n.label.toLowerCase().includes(q)).map((n) => n.id)
+    );
+  }, [debouncedQ, graphData.nodes]);
+
+  // ── Canvas draw ──────────────────────────────────────────────────────────
   const drawNode = useCallback(
     (node, ctx, globalScale) => {
-      const r = nodeRadius(node.weight);
-      const color = node.color;
-      const isSelected = node.id === selectedId;
-      const isHovered = node.id === hoveredId;
-      const isConnected = hoveredId && hoveredConnected.has(node.id);
+      const isSelected    = node.id === selectedId;
+      const isHovered     = node.id === hoveredId;
+      const isSelConn     = selectedId && selConnected.has(node.id);
+      const inHovCluster  = hovConnected ? hovConnected.has(node.id) : true;
+      const searchMatch   = !matchIds || matchIds.has(node.id);
 
-      const q = debouncedSearch.trim();
-      let opacity = 1;
-      if (q && !node.searchMatch) opacity = 0.08;
-      else if (hoveredId && !isConnected) opacity = 0.05;
+      const r     = getNodeR(node, selectedId, hoveredId);
+      const color = getNodeColor(node, selectedId, hoveredId, selConnected);
 
-      ctx.globalAlpha = opacity;
+      // Dim non-matching nodes
+      let alpha = 1;
+      if (matchIds && !searchMatch)             alpha = 0.04;
+      else if (hovConnected && !inHovCluster)   alpha = 0.12;
 
-      // Glow: larger faint pass first
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, r * 2.5, 0, 2 * Math.PI);
-      ctx.fillStyle = `${color}18`;
-      ctx.fill();
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      // Glow halo for selected / selected-neighbor / hovered
+      if (isSelected || isHovered || isSelConn) {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, r + 5, 0, 2 * Math.PI);
+        ctx.fillStyle =
+          isSelected || isHovered
+            ? "rgba(255,255,255,0.05)"
+            : "rgba(34,197,94,0.07)";
+        ctx.fill();
+      }
 
       // Main dot
       ctx.beginPath();
@@ -205,60 +209,103 @@ export default function KnowledgeWeb() {
       ctx.fillStyle = color;
       ctx.fill();
 
-      if (isSelected || isHovered) {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, r + 4, 0, 2 * Math.PI);
-        ctx.strokeStyle = `${color}80`;
-        ctx.lineWidth = 2 / globalScale;
-        ctx.stroke();
-      }
-
-      ctx.globalAlpha = opacity;
-      if (isSelected || isHovered || (globalScale > 1.5 && node.searchMatch)) {
-        const label = node.label || "(no label)";
-        const fontSize = Math.max(9, 11 / globalScale);
+      // Label — only on hover, selected, or zoom > 2
+      if (isSelected || isHovered || (globalScale > 2 && searchMatch)) {
+        const label    = node.label || "";
+        const fontSize = Math.max(8, 10 / globalScale);
         ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
-        ctx.textAlign = "center";
+        ctx.textAlign    = "center";
         ctx.textBaseline = "bottom";
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillText(label, node.x + 1, node.y - r - 4 + 1);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(label, node.x, node.y - r - 4);
+        // Drop shadow
+        ctx.fillStyle = "rgba(0,0,0,0.95)";
+        ctx.fillText(label, node.x + 0.5, node.y - r - 3 + 0.5);
+        ctx.fillStyle = isSelected
+          ? "#ffffff"
+          : isHovered
+          ? "#e5e7eb"
+          : "#9ca3af";
+        ctx.fillText(label, node.x, node.y - r - 3);
       }
 
-      ctx.globalAlpha = 1;
+      ctx.restore();
     },
-    [selectedId, hoveredId, hoveredConnected, debouncedSearch]
+    [selectedId, hoveredId, selConnected, hovConnected, matchIds]
   );
 
-  const drawNodeHitArea = (node, color, ctx) => {
-    const r = nodeRadius(node.weight);
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, Math.max(r + 4, 10), 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-  };
+  const paintHitArea = useCallback(
+    (node, color, ctx) => {
+      const r = Math.max(getNodeR(node, selectedId, hoveredId) + 4, 8);
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+    },
+    [selectedId, hoveredId]
+  );
 
-  // Right-click context menu
-  const handleBackgroundRightClick = useCallback((evt) => {
-    evt.preventDefault();
-    setContextMenu({ x: evt.clientX, y: evt.clientY });
+  // ── Link color / width ───────────────────────────────────────────────────
+  const linkColor = useCallback(
+    (link) => {
+      const s = typeof link.source === "object" ? link.source.id : link.source;
+      const t = typeof link.target === "object" ? link.target.id : link.target;
+      if (selectedId && (s === selectedId || t === selectedId)) return "#6b7280";
+      if (hoveredId  && (s === hoveredId  || t === hoveredId))  return "#4a5568";
+      return "#2d3148";
+    },
+    [selectedId, hoveredId]
+  );
+
+  const linkWidth = useCallback(
+    (link) => {
+      const s = typeof link.source === "object" ? link.source.id : link.source;
+      const t = typeof link.target === "object" ? link.target.id : link.target;
+      if (selectedId && (s === selectedId || t === selectedId)) return 1.5;
+      if (hoveredId  && (s === hoveredId  || t === hoveredId))  return 1.2;
+      return 0.8;
+    },
+    [selectedId, hoveredId]
+  );
+
+  // ── Interaction ──────────────────────────────────────────────────────────
+  const handleNodeClick = useCallback(
+    (node, evt) => {
+      evt.stopPropagation();
+      if (node.id === selectedId) {
+        setSelectedId(null);
+        setPanelOpen(false);
+      } else {
+        setSelectedId(node.id);
+        setPanelOpen(true);
+        setEditMode(false);
+      }
+      setFocusNodeId(null);
+    },
+    [selectedId, setFocusNodeId]
+  );
+
+  const handleNodeDbl = useCallback((node) => {
+    fgRef.current?.centerAt(node.x, node.y, 500);
+    fgRef.current?.zoom(6, 500);
   }, []);
 
-  const handleNodeDelete = async () => {
+  const handleBgClick = useCallback(() => {
+    setSelectedId(null);
+    setPanelOpen(false);
+    setContextMenu(null);
+  }, []);
+
+  // ── CRUD ─────────────────────────────────────────────────────────────────
+  const handleDelete = async () => {
     if (!selectedNode) return;
     try {
       await deleteKnowledgeNode(selectedNode.id);
       setSelectedId(null);
-      // Refresh
-      const data = await getKnowledgeWeb();
-      setRawData(data);
-    } catch {
-      // ignore
-    }
+      setPanelOpen(false);
+      await refreshGraph();
+    } catch {/* ignore */}
   };
 
-  const handleNodeSave = async () => {
+  const handleSave = async () => {
     if (!selectedNode) return;
     try {
       await updateKnowledgeNode(selectedNode.id, {
@@ -266,270 +313,68 @@ export default function KnowledgeWeb() {
         description: editDesc,
       });
       setEditMode(false);
-      const data = await getKnowledgeWeb();
-      setRawData(data);
-    } catch {
-      // ignore
-    }
+      await refreshGraph();
+    } catch {/* ignore */}
   };
 
-  // Search results list (API search for long queries)
-  const [apiResults, setApiResults] = useState(null);
-  useEffect(() => {
-    if (!debouncedSearch || debouncedSearch.split(" ").length <= 3) {
-      setApiResults(null);
-      return;
-    }
-    searchKnowledge(debouncedSearch)
-      .then((res) => setApiResults(res))
-      .catch(() => {});
-  }, [debouncedSearch]);
+  // ── Zoom helpers ─────────────────────────────────────────────────────────
+  const zoomIn  = (e) => { e.stopPropagation(); const fg = fgRef.current; if (fg) fg.zoom(fg.zoom() * 1.4, 250); };
+  const zoomOut = (e) => { e.stopPropagation(); const fg = fgRef.current; if (fg) fg.zoom(fg.zoom() / 1.4, 250); };
+  const fitAll  = (e) => { e.stopPropagation(); fgRef.current?.zoomToFit(400, 40); };
 
-  const displayResults = apiResults
-    ? apiResults.nodes
-    : filteredGraph
-    ? filteredGraph.nodes.filter((n) => n.searchMatch && debouncedSearch)
-    : [];
-
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className={styles.page}>
-      {/* Left panel */}
-      <aside className={styles.leftPanel}>
-        <div className={styles.searchRow}>
-          <input
-            className={styles.searchInput}
-            type="search"
-            placeholder="Search knowledge…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search knowledge nodes"
-          />
-        </div>
-
-        {/* Type filter checkboxes */}
-        <div className={styles.typeFilters}>
-          <p className={styles.filterLabel}>Node types</p>
-          {ALL_TYPES.map((t) => (
-            <label key={t} className={styles.typeCheck}>
-              <input
-                type="checkbox"
-                checked={typeFilter.has(t)}
-                onChange={() => {
-                  setTypeFilter((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(t)) next.delete(t);
-                    else next.add(t);
-                    return next;
-                  });
-                }}
-              />
-              <span
-                className={styles.typeDot}
-                style={{ backgroundColor: NODE_COLORS[t] }}
-              />
-              <span>{t.replace(/_/g, " ")}</span>
-            </label>
-          ))}
-        </div>
-
-        <Button
-          variant="primary"
-          size="sm"
-          leadingIcon={<Plus size={14} />}
-          onClick={() => setShowAddModal(true)}
-          className={styles.addBtn}
-        >
-          Add knowledge
-        </Button>
-
-        {/* Search results */}
-        {debouncedSearch && displayResults.length > 0 && (
-          <div className={styles.searchResults}>
-            <p className={styles.filterLabel}>Results ({displayResults.length})</p>
-            {displayResults.slice(0, 20).map((n) => (
-              <button
-                key={n.id}
-                className={styles.resultItem}
-                onClick={() => {
-                  setSelectedId(n.id);
-                  const node = rawData?.nodes.find((rn) => rn.id === n.id);
-                  if (node && fgRef.current) {
-                    fgRef.current.centerAt(node.x ?? 0, node.y ?? 0, 800);
-                    fgRef.current.zoom(3, 800);
-                  }
-                }}
-              >
-                <span
-                  className={styles.typeDot}
-                  style={{ backgroundColor: NODE_COLORS[n.node_type] ?? "#71717a" }}
-                />
-                <span>{n.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Selected node details */}
-        {selectedNode && (
-          <div className={styles.selectedPanel}>
-            <div className={styles.selectedHeader}>
-              <span
-                className={styles.typeDot}
-                style={{ backgroundColor: NODE_COLORS[selectedNode.node_type] ?? "#71717a" }}
-              />
-              <span className={styles.selectedType}>{selectedNode.node_type}</span>
-              <button
-                className={styles.closeBtn}
-                onClick={() => setSelectedId(null)}
-                aria-label="Close"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            {editMode ? (
-              <div className={styles.editForm}>
-                <input
-                  className={styles.editInput}
-                  value={editLabel}
-                  onChange={(e) => setEditLabel(e.target.value)}
-                  placeholder="Label"
-                />
-                <textarea
-                  className={styles.editTextarea}
-                  value={editDesc}
-                  onChange={(e) => setEditDesc(e.target.value)}
-                  placeholder="Description"
-                  rows={3}
-                />
-                <div className={styles.editActions}>
-                  <Button variant="primary" size="sm" onClick={handleNodeSave}>Save</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setEditMode(false)}>Cancel</Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <h3 className={styles.selectedTitle}>{selectedNode.label}</h3>
-                {selectedNode.description && (
-                  <p className={styles.selectedDesc}>{selectedNode.description}</p>
-                )}
-                {selectedNode.metadata && Object.keys(selectedNode.metadata).length > 0 && (
-                  <dl className={styles.metaList}>
-                    {Object.entries(selectedNode.metadata).slice(0, 4).map(([k, v]) => (
-                      <div key={k} className={styles.metaRow}>
-                        <dt>{k}</dt>
-                        <dd>{String(v)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-
-                {/* Connections grouped by type */}
-                {filteredGraph && (() => {
-                  const conns = filteredGraph.links.filter((l) => {
-                    const s = typeof l.source === "object" ? l.source.id : l.source;
-                    const t = typeof l.target === "object" ? l.target.id : l.target;
-                    return s === selectedId || t === selectedId;
-                  });
-                  const grouped = {};
-                  for (const c of conns) {
-                    const s = typeof c.source === "object" ? c.source.id : c.source;
-                    const t = typeof c.target === "object" ? c.target.id : c.target;
-                    const otherId = s === selectedId ? t : s;
-                    const other = nodeIndex[otherId];
-                    const key = other?.node_type || "other";
-                    if (!grouped[key]) grouped[key] = [];
-                    grouped[key].push(other?.label || otherId?.slice(0, 8));
-                  }
-                  return Object.keys(grouped).length > 0 ? (
-                    <div className={styles.connGroups}>
-                      {Object.entries(grouped).map(([type, labels]) => (
-                        <div key={type} className={styles.connGroup}>
-                          <span className={styles.connGroupType}>
-                            {type.replace(/_/g, " ")} ({labels.length}):{" "}
-                          </span>
-                          {labels.slice(0, 5).map((l, i) => (
-                            <span key={i} className={styles.connChip}>{l}</span>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null;
-                })()}
-
-                <div className={styles.nodeActions}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditLabel(selectedNode.label || "");
-                      setEditDesc(selectedNode.description || "");
-                      setEditMode(true);
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    leadingIcon={<Trash2 size={12} />}
-                    onClick={handleNodeDelete}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </aside>
-
-      {/* Right graph panel */}
+    <div className={styles.page} onClick={handleBgClick}>
+      {/* Graph fills entire page */}
       <div
-        ref={containerRef}
+        ref={shellRef}
         className={styles.graphShell}
-        onContextMenu={handleBackgroundRightClick}
-        onClick={() => contextMenu && setContextMenu(null)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setContextMenu({ x: e.clientX, y: e.clientY });
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {loading && (
-          <div className={styles.overlay}>
-            <Skeleton width="60%" height={20} />
-            <Skeleton width="80%" height={14} />
-          </div>
-        )}
-        {error && (
-          <div className={styles.overlay}>
-            <Card className={styles.errorCard}>{error}</Card>
-          </div>
-        )}
-        {!loading && !error && filteredGraph && filteredGraph.nodes.length === 0 && (
-          <div className={styles.overlay}>
-            <EmptyState
-              icon={Brain}
-              title="No knowledge nodes"
-              description="Add knowledge nodes to populate the web, or enable more node types."
-            />
-          </div>
-        )}
-        {!loading && !error && filteredGraph && filteredGraph.nodes.length > 0 && (
+        {!isLoading && graphData.nodes.length > 0 && (
           <ForceGraph2D
             ref={fgRef}
-            graphData={filteredGraph}
+            graphData={graphData}
             width={size.w}
             height={size.h}
-            backgroundColor="#050505"
+            backgroundColor="#1a1b26"
             nodeCanvasObject={drawNode}
-            nodePointerAreaPaint={drawNodeHitArea}
-            nodeLabel={(n) => `${n.node_type}: ${n.label}`}
-            linkColor={() => "#ffffff08"}
-            linkWidth={0.5}
-            linkDirectionalParticles={1}
-            linkDirectionalParticleSpeed={0.003}
-            onNodeClick={(n) => setSelectedId(n.id === selectedId ? null : n.id)}
-            onNodeHover={(n) => setHoveredId(n ? n.id : null)}
-            cooldownTicks={120}
+            nodePointerAreaPaint={paintHitArea}
+            nodeLabel={() => ""}
+            linkColor={linkColor}
+            linkWidth={linkWidth}
+            onNodeClick={handleNodeClick}
+            onNodeDblClick={handleNodeDbl}
+            onNodeHover={(node) => {
+              setHoveredId(node ? node.id : null);
+              document.body.style.cursor = node ? "pointer" : "default";
+            }}
+            onBackgroundClick={handleBgClick}
+            cooldownTicks={150}
+            d3AlphaDecay={0.02}
             d3VelocityDecay={0.35}
           />
+        )}
+
+        {isLoading && (
+          <div className={styles.loadingOverlay}>
+            <div className={styles.spinner} />
+            <p className={styles.loadingText}>Loading graph…</p>
+          </div>
+        )}
+
+        {!isLoading && graphData.nodes.length === 0 && (
+          <div className={styles.emptyOverlay}>
+            <p className={styles.emptyTitle}>No knowledge nodes</p>
+            <p className={styles.emptyHint}>
+              Right-click anywhere to add the first node
+            </p>
+          </div>
         )}
 
         {/* Context menu */}
@@ -540,27 +385,221 @@ export default function KnowledgeWeb() {
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className={styles.contextMenuItem}
+              className={styles.contextItem}
               onClick={() => {
                 setShowAddModal(true);
                 setContextMenu(null);
               }}
             >
-              <Plus size={14} /> Add knowledge node
+              <Plus size={13} />
+              Add knowledge node
             </button>
           </div>
         )}
       </div>
 
-      {/* Add node modal */}
+      {/* ── Floating search — top left ─────────────────────────────────── */}
+      <div
+        className={styles.searchFloat}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          className={styles.searchInput}
+          type="search"
+          placeholder="Search…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search knowledge nodes"
+        />
+        {debouncedQ && matchIds !== null && (
+          <span className={styles.searchCount}>{matchIds.size}</span>
+        )}
+      </div>
+
+      {/* ── Floating zoom controls — bottom right ──────────────────────── */}
+      <div
+        className={styles.zoomControls}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button className={styles.zoomBtn} onClick={zoomIn}  title="Zoom in">
+          <Plus size={13} />
+        </button>
+        <button className={styles.zoomBtn} onClick={zoomOut} title="Zoom out">
+          <Minus size={13} />
+        </button>
+        <button className={styles.zoomBtn} onClick={fitAll}  title="Fit to screen">
+          <Maximize2 size={12} />
+        </button>
+      </div>
+
+      {/* ── Right detail panel ──────────────────────────────────────────── */}
+      <aside
+        className={`${styles.rightPanel} ${panelOpen ? styles.rightPanelOpen : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {selectedNode && (
+          <div className={styles.panelInner}>
+            {/* Header */}
+            <div className={styles.panelHeader}>
+              <span
+                className={styles.typeBadge}
+                style={
+                  ACCENT_TYPES.has(selectedNode.node_type)
+                    ? { background: "rgba(34,197,94,0.12)", color: "#22c55e" }
+                    : { background: "rgba(74,79,106,0.25)", color: "#9ca3af" }
+                }
+              >
+                {selectedNode.node_type.replace(/_/g, " ")}
+              </span>
+              <button
+                className={styles.panelClose}
+                onClick={() => {
+                  setSelectedId(null);
+                  setPanelOpen(false);
+                }}
+                aria-label="Close panel"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {editMode ? (
+              /* ── Edit form ── */
+              <div className={styles.editForm}>
+                <input
+                  className={styles.editInput}
+                  value={editLabel}
+                  onChange={(e) => setEditLabel(e.target.value)}
+                  placeholder="Label"
+                  autoFocus
+                />
+                <textarea
+                  className={styles.editTextarea}
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  placeholder="Description (optional)"
+                  rows={4}
+                />
+                <div className={styles.editActions}>
+                  <button
+                    className={styles.btnPrimary}
+                    onClick={handleSave}
+                  >
+                    Save
+                  </button>
+                  <button
+                    className={styles.btnGhost}
+                    onClick={() => setEditMode(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h2 className={styles.panelTitle}>{selectedNode.label}</h2>
+
+                {selectedNode.description && (
+                  <p className={styles.panelDesc}>{selectedNode.description}</p>
+                )}
+
+                {/* Connections */}
+                {(() => {
+                  const conns = graphData.links.filter((l) => {
+                    const s = typeof l.source === "object" ? l.source.id : l.source;
+                    const t = typeof l.target === "object" ? l.target.id : l.target;
+                    return s === selectedId || t === selectedId;
+                  });
+                  if (conns.length === 0) return null;
+                  return (
+                    <div className={styles.connections}>
+                      <p className={styles.connHeading}>
+                        Connections ({conns.length})
+                      </p>
+                      <div className={styles.connChips}>
+                        {conns.slice(0, 24).map((l, i) => {
+                          const s = typeof l.source === "object" ? l.source.id : l.source;
+                          const t = typeof l.target === "object" ? l.target.id : l.target;
+                          const otherId = s === selectedId ? t : s;
+                          const other = nodeMap[otherId];
+                          if (!other) return null;
+                          return (
+                            <button
+                              key={i}
+                              className={styles.connChip}
+                              onClick={() => {
+                                setSelectedId(otherId);
+                                const n = graphData.nodes.find(
+                                  (x) => x.id === otherId
+                                );
+                                if (n?.x != null && fgRef.current) {
+                                  fgRef.current.centerAt(n.x, n.y, 500);
+                                }
+                              }}
+                            >
+                              <span
+                                className={styles.connDot}
+                                style={{
+                                  backgroundColor: ACCENT_TYPES.has(
+                                    other.node_type
+                                  )
+                                    ? "#22c55e"
+                                    : "#4a4f6a",
+                                }}
+                              />
+                              {other.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className={styles.panelDivider} />
+
+                {/* Actions */}
+                <div className={styles.panelActions}>
+                  <button
+                    className={styles.btnGhost}
+                    onClick={() => {
+                      setEditLabel(selectedNode.label || "");
+                      setEditDesc(selectedNode.description || "");
+                      setEditMode(true);
+                    }}
+                  >
+                    <Pencil size={12} />
+                    Edit
+                  </button>
+                  <button
+                    className={styles.btnGhost}
+                    onClick={() => setShowAddModal(true)}
+                  >
+                    <Link size={12} />
+                    Add connection
+                  </button>
+                  <button
+                    className={styles.btnDanger}
+                    onClick={handleDelete}
+                  >
+                    <Trash2 size={12} />
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </aside>
+
+      {/* ── Add node modal ──────────────────────────────────────────────── */}
       {showAddModal && (
         <AddNodeModal
-          existingNodes={rawData?.nodes || []}
+          existingNodes={rawNodes}
           onClose={() => setShowAddModal(false)}
           onCreated={async () => {
             setShowAddModal(false);
-            const data = await getKnowledgeWeb();
-            setRawData(data);
+            await refreshGraph();
           }}
         />
       )}
@@ -568,20 +607,22 @@ export default function KnowledgeWeb() {
   );
 }
 
-// --- Add Node Modal ---
+// ── AddNodeModal ─────────────────────────────────────────────────────────────
 
 function AddNodeModal({ existingNodes, onClose, onCreated }) {
-  const [label, setLabel] = useState("");
-  const [type, setType] = useState("tag");
-  const [desc, setDesc] = useState("");
-  const [connectSearch, setConnectSearch] = useState("");
-  const [connectTo, setConnectTo] = useState([]);
-  const [saving, setSaving] = useState(false);
+  const [label, setLabel]               = useState("");
+  const [type, setType]                 = useState("tag");
+  const [desc, setDesc]                 = useState("");
+  const [connectSearch, setConnSearch]  = useState("");
+  const [connectTo, setConnectTo]       = useState([]);
+  const [saving, setSaving]             = useState(false);
 
   const matchingNodes = connectSearch
-    ? existingNodes.filter((n) =>
-        n.label.toLowerCase().includes(connectSearch.toLowerCase())
-      ).slice(0, 10)
+    ? existingNodes
+        .filter((n) =>
+          n.label.toLowerCase().includes(connectSearch.toLowerCase())
+        )
+        .slice(0, 10)
     : [];
 
   const handleSubmit = async (e) => {
@@ -589,16 +630,20 @@ function AddNodeModal({ existingNodes, onClose, onCreated }) {
     if (!label.trim()) return;
     setSaving(true);
     try {
-      await createKnowledgeNode({
+      const node = await createKnowledgeNode({
         label: label.trim(),
         node_type: type,
         description: desc.trim() || undefined,
-        connect_to: connectTo,
       });
+      for (const targetId of connectTo) {
+        await createKnowledgeEdge({
+          source_node_id: node.id,
+          target_node_id: targetId,
+          relationship_type: "related",
+        }).catch(() => {});
+      }
       await onCreated();
-    } catch {
-      // ignore
-    } finally {
+    } catch {/* ignore */} finally {
       setSaving(false);
     }
   };
@@ -608,13 +653,18 @@ function AddNodeModal({ existingNodes, onClose, onCreated }) {
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <header className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Add knowledge node</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
+          <button
+            className={styles.panelClose}
+            onClick={onClose}
+            aria-label="Close"
+          >
             <X size={16} />
           </button>
         </header>
+
         <form className={styles.modalForm} onSubmit={handleSubmit}>
           <label className={styles.formLabel}>
-            Label <span className={styles.required}>*</span>
+            Label <span className={styles.req}>*</span>
             <input
               className={styles.formInput}
               value={label}
@@ -653,49 +703,68 @@ function AddNodeModal({ existingNodes, onClose, onCreated }) {
           </label>
 
           <label className={styles.formLabel}>
-            Connect to (search existing nodes)
+            Connect to
             <input
               className={styles.formInput}
               value={connectSearch}
-              onChange={(e) => setConnectSearch(e.target.value)}
-              placeholder="Search nodes…"
+              onChange={(e) => setConnSearch(e.target.value)}
+              placeholder="Search existing nodes…"
             />
           </label>
+
           {matchingNodes.length > 0 && (
             <div className={styles.connectList}>
               {matchingNodes.map((n) => (
                 <button
                   key={n.id}
                   type="button"
-                  className={`${styles.connectItem} ${connectTo.includes(n.id) ? styles.connectItemSelected : ""}`}
-                  onClick={() => {
+                  className={`${styles.connectItem} ${
+                    connectTo.includes(n.id) ? styles.connectItemSel : ""
+                  }`}
+                  onClick={() =>
                     setConnectTo((prev) =>
-                      prev.includes(n.id) ? prev.filter((id) => id !== n.id) : [...prev, n.id]
-                    );
-                  }}
+                      prev.includes(n.id)
+                        ? prev.filter((id) => id !== n.id)
+                        : [...prev, n.id]
+                    )
+                  }
                 >
                   <span
-                    className={styles.typeDot}
-                    style={{ backgroundColor: NODE_COLORS[n.node_type] ?? "#71717a" }}
+                    className={styles.connDot}
+                    style={{
+                      backgroundColor: ACCENT_TYPES.has(n.node_type)
+                        ? "#22c55e"
+                        : "#4a4f6a",
+                    }}
                   />
                   {n.label}
                 </button>
               ))}
             </div>
           )}
+
           {connectTo.length > 0 && (
-            <p className={styles.connectCount}>
-              Will connect to {connectTo.length} node{connectTo.length > 1 ? "s" : ""}
+            <p className={styles.connectHint}>
+              Will connect to {connectTo.length} node
+              {connectTo.length > 1 ? "s" : ""}
             </p>
           )}
 
           <div className={styles.modalActions}>
-            <Button variant="ghost" size="md" type="button" onClick={onClose}>
+            <button
+              type="button"
+              className={styles.btnGhost}
+              onClick={onClose}
+            >
               Cancel
-            </Button>
-            <Button variant="primary" size="md" type="submit" disabled={saving || !label.trim()}>
+            </button>
+            <button
+              type="submit"
+              className={styles.btnPrimary}
+              disabled={saving || !label.trim()}
+            >
               {saving ? "Creating…" : "Create node"}
-            </Button>
+            </button>
           </div>
         </form>
       </div>

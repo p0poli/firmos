@@ -2,6 +2,7 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import PrivateRoute from "./components/PrivateRoute";
 import { ChatProvider } from "./contexts/ChatContext";
+import { KnowledgeGraphProvider } from "./contexts/KnowledgeGraphContext";
 import { PageTitleProvider } from "./contexts/PageTitleContext";
 import { UserProvider } from "./contexts/UserContext";
 import Dashboard from "./pages/Dashboard";
@@ -27,36 +28,42 @@ export default function App() {
         {/* ChatProvider must live inside HashRouter so useMatch() resolves
             against the current hash path for project-scoped chat. */}
         <ChatProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            {/* Standalone chat page for the Revit WebView2 dockable panel.
-                No layout — auth handled via localStorage token injected by C#. */}
-            <Route path="/revit-chat" element={<RevitChat />} />
-            {/* Public, unauth — visual sanity check for design-system
-                primitives. Mounted at /#/_styleguide; kept around as a
-                live reference for the design system. */}
-            <Route path="/_styleguide" element={<Styleguide />} />
-            <Route
-              element={
-                <PrivateRoute>
-                  <Layout />
-                </PrivateRoute>
-              }
-            >
-              <Route index element={<Dashboard />} />
-              <Route path="portfolio" element={<Portfolio />} />
-              <Route path="project/:id" element={<ProjectDetail />} />
-              <Route path="tasks" element={<Tasks />} />
-              <Route path="gantt" element={<Gantt />} />
-              <Route path="files" element={<Files />} />
-              <Route path="knowledge" element={<ProjectGraph />} />
-              <Route path="knowledge-web" element={<KnowledgeWeb />} />
-              <Route path="my-world" element={<MyWorld />} />
-              <Route path="management" element={<Management />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          {/* KnowledgeGraphProvider lives here so both the sidebar mini-graph
+              and the KnowledgeWeb page share a single /knowledge/web fetch,
+              refreshed every 60 s. Must be inside HashRouter (not needed for
+              routing, but consistent nesting order). */}
+          <KnowledgeGraphProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              {/* Standalone chat page for the Revit WebView2 dockable panel.
+                  No layout — auth handled via localStorage token injected by C#. */}
+              <Route path="/revit-chat" element={<RevitChat />} />
+              {/* Public, unauth — visual sanity check for design-system
+                  primitives. Mounted at /#/_styleguide; kept around as a
+                  live reference for the design system. */}
+              <Route path="/_styleguide" element={<Styleguide />} />
+              <Route
+                element={
+                  <PrivateRoute>
+                    <Layout />
+                  </PrivateRoute>
+                }
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="portfolio" element={<Portfolio />} />
+                <Route path="project/:id" element={<ProjectDetail />} />
+                <Route path="tasks" element={<Tasks />} />
+                <Route path="gantt" element={<Gantt />} />
+                <Route path="files" element={<Files />} />
+                <Route path="knowledge" element={<ProjectGraph />} />
+                <Route path="knowledge-web" element={<KnowledgeWeb />} />
+                <Route path="my-world" element={<MyWorld />} />
+                <Route path="management" element={<Management />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </KnowledgeGraphProvider>
         </ChatProvider>
       </HashRouter>
     </PageTitleProvider>
