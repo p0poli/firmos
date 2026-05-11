@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/firmos/static/css/main.f59f214b.css",
+    "main.js": "/firmos/static/js/main.a19a938c.js",
+    "index.html": "/firmos/index.html",
+    "main.f59f214b.css.map": "/firmos/static/css/main.f59f214b.css.map",
+    "main.a19a938c.js.map": "/firmos/static/js/main.a19a938c.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.f59f214b.css",
+    "static/js/main.a19a938c.js"
+  ]
+}
