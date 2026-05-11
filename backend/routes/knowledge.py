@@ -547,16 +547,17 @@ def update_node(
     return _node_to_out(node, weights.get(str(node.id), 0))
 
 
-@router.delete("/nodes/{node_id}", status_code=204)
+@router.delete("/nodes/{node_id}", status_code=200)
 def delete_node(
     node_id: UUID,
     db: OrmSession = Depends(get_db),
     user: User = Depends(auth_service.get_current_user),
-) -> None:
+) -> dict:
     node = db.query(KnowledgeNode).filter(KnowledgeNode.id == node_id).first()
     if node:
         db.delete(node)
         db.commit()
+    return {"deleted": True, "node_id": node_id}
 
 
 @router.post("/edges", response_model=EdgeOut, status_code=201)
